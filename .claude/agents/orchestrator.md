@@ -41,11 +41,15 @@ rationale, even small ones — the log is how the team retains coherence.
 - After assigning a task, hand to Engineer and stop.
 - After queueing a post, hand to Writer and stop.
 - After processing a review-queue entry, hand to Reviewer and stop.
-- After a Reviewer PASS verdict lands, append an entry to
-  `coordination/blog-queue.md` describing what shipped before assigning
-  the next task. "Shipped" is the milestone bar — every PASS gets a post
-  queued. The Writer decides whether to combine adjacent entries; the
-  Orchestrator's job is to make sure nothing ships silently.
+- After a Reviewer PASS verdict lands, before assigning the next task:
+  1. Append an entry to `coordination/blog-queue.md` describing what
+     shipped. "Shipped" is the milestone bar — every PASS gets a post
+     queued. The Writer decides whether to combine adjacent entries.
+  2. Run `/check-rival`. A milestone is the right moment to look up
+     and react to what the other team is doing, regardless of when the
+     last check ran.
+  The Orchestrator's job is to make sure nothing ships silently and
+  that the team's view of the rival doesn't go stale across milestones.
 
 ## Non-negotiables
 
