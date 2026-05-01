@@ -1,4 +1,13 @@
-import { createSession, getSession, joinSession, type Session } from "./sessions";
+import {
+  advanceSession,
+  createSession,
+  getSession,
+  joinSession,
+  submitAnswer,
+  type Participant,
+  type Session,
+} from "./sessions";
+import { prompts, type Prompt } from "./prompts";
 
 type Env = {
   SESSIONS: KVNamespace;
@@ -7,6 +16,8 @@ type Env = {
 const PARTICIPANT_COOKIE = "rt_pid";
 const COOKIE_MAX_AGE = 60 * 60 * 24;
 const SESSION_TARGET_PARTICIPANTS = 2;
+const PARTICIPANT_LABEL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const MAX_ANSWER_LENGTH = 2000;
 
 const sharedStyles = `
   :root {
@@ -14,6 +25,8 @@ const sharedStyles = `
     --paper: #f6f3ee;
     --accent: #2f4f3f;
     --muted: #6b6b6b;
+    --card: #ffffff;
+    --border: rgba(0,0,0,0.08);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -36,6 +49,11 @@ const sharedStyles = `
     font-size: 2.75rem;
     margin: 0 0 0.25rem;
     letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 1.5rem;
+    margin: 0 0 1rem;
+    letter-spacing: -0.005em;
   }
   .tagline {
     color: var(--muted);
@@ -62,14 +80,14 @@ const sharedStyles = `
     padding: 2rem 1.5rem 3rem;
     font-size: 0.85rem;
     color: var(--muted);
-    border-top: 1px solid rgba(0,0,0,0.08);
+    border-top: 1px solid var(--border);
   }
   .code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 2.25rem;
     letter-spacing: 0.25em;
     background: #fff;
-    border: 1px solid rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
     border-radius: 0.5rem;
     padding: 0.75rem 1.25rem;
     display: inline-block;
@@ -80,7 +98,7 @@ const sharedStyles = `
     font-size: 0.95rem;
     word-break: break-all;
     background: #fff;
-    border: 1px solid rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
     border-radius: 0.5rem;
     padding: 0.6rem 0.85rem;
     display: block;
@@ -97,6 +115,72 @@ const sharedStyles = `
     margin: 0 0 2rem;
   }
   a.back { color: var(--accent); }
+  .deck-meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 0.75rem;
+  }
+  .prompt {
+    font-size: 1.4rem;
+    line-height: 1.45;
+    margin: 0 0 1.5rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+  }
+  textarea {
+    width: 100%;
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: #fff;
+    resize: vertical;
+    margin: 0 0 1rem;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .helper {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem;
+  }
+  .answers {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin: 0 0 2rem;
+  }
+  @media (min-width: 32rem) {
+    .answers.side-by-side { grid-template-columns: 1fr 1fr; }
+  }
+  .answer-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem 1.15rem;
+  }
+  .answer-card .label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+  .answer-card .body {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .recap-item {
+    margin: 0 0 2rem;
+    padding: 0 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .recap-item:last-child { border-bottom: 0; }
 `;
 
 const escapeHtml = (s: string): string =>
@@ -115,6 +199,12 @@ const escapeHtml = (s: string): string =>
     }
     return "&#39;";
   });
+
+const sharedFooter = `<footer>
+      Roundtable does not provide financial, tax, legal, or investment
+      advice. Sessions are stored on Cloudflare KV for 24 hours, then
+      deleted. We do not collect accounts, names, or emails.
+    </footer>`;
 
 const landingHtml = `<!doctype html>
 <html lang="en-GB">
@@ -139,11 +229,7 @@ const landingHtml = `<!doctype html>
         <button class="cta" type="submit">Start a session</button>
       </form>
     </main>
-    <footer>
-      Roundtable does not provide financial, tax, legal, or investment
-      advice. Sessions are stored on Cloudflare KV for 24 hours, then
-      deleted. We do not collect accounts, names, or emails.
-    </footer>
+    ${sharedFooter}
   </body>
 </html>
 `;
@@ -187,7 +273,48 @@ const sessionFullHtml = `<!doctype html>
 </html>
 `;
 
-const renderInsideView = (
+const renderActionErrorHtml = (code: string, message: string): string =>
+  `<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roundtable — couldn't save that</title>
+    <style>${sharedStyles}</style>
+  </head>
+  <body>
+    <main>
+      <h1>That didn't go through</h1>
+      <p class="lede">${escapeHtml(message)}</p>
+      <p><a class="back" href="/s/${escapeHtml(code)}">Back to the session</a></p>
+    </main>
+  </body>
+</html>
+`;
+
+// Participant labels are positional and derived at render time — first
+// joiner is "Participant A", second "Participant B", and so on. We do
+// not store the label.
+const sortedParticipants = (session: Session): Array<Participant> =>
+  [...session.participants].sort((a, b) => a.joinedAt - b.joinedAt);
+
+const submittedCountFor = (
+  session: Session,
+  promptId: string,
+): number => {
+  const answers = session.answers[promptId];
+  if (answers === undefined) {
+    return 0;
+  }
+  return session.participants.reduce((acc, p) => {
+    if (typeof answers[p.id] === "string") {
+      return acc + 1;
+    }
+    return acc;
+  }, 0);
+};
+
+const renderWaitingForJoiner = (
   session: Session,
   origin: string,
 ): string => {
@@ -214,45 +341,208 @@ const renderInsideView = (
       </p>
       <p><a class="back" href="/">Back to the start</a></p>
     </main>
-    <footer>
-      Roundtable does not provide financial, tax, legal, or investment
-      advice. Sessions are stored on Cloudflare KV for 24 hours, then
-      deleted. We do not collect accounts, names, or emails.
-    </footer>
+    ${sharedFooter}
   </body>
 </html>
 `;
 };
 
-const renderJoinView = (code: string): string =>
-  `<!doctype html>
+const renderAnswerView = (
+  session: Session,
+  prompt: Prompt,
+): string => {
+  const promptNumber = session.currentPromptIndex + 1;
+  const total = prompts.length;
+  return `<!doctype html>
 <html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Roundtable — join session ${escapeHtml(code)}</title>
+    <meta http-equiv="refresh" content="5" />
+    <title>Roundtable — prompt ${promptNumber} of ${total}</title>
     <style>${sharedStyles}</style>
   </head>
   <body>
     <main>
-      <h1>Join this session</h1>
-      <p class="tagline">You have been invited to a Roundtable session.</p>
-      <p class="lede">
-        Tap below to join. The link itself is your invitation — there is
-        no code to type.
-      </p>
-      <form method="post" action="/s/${escapeHtml(code)}/join">
-        <button class="cta" type="submit">Join this session</button>
+      <p class="deck-meta">Prompt ${promptNumber} of ${total}</p>
+      <p class="prompt">${escapeHtml(prompt.text)}</p>
+      <form method="post" action="/s/${escapeHtml(session.code)}/answer">
+        <input type="hidden" name="prompt_id" value="${escapeHtml(prompt.id)}" />
+        <textarea name="text" maxlength="${MAX_ANSWER_LENGTH}" rows="6" required placeholder="Take your time. There's no right answer."></textarea>
+        <p class="helper">Your partner won't see this until they've also submitted.</p>
+        <button class="cta" type="submit">Submit privately</button>
       </form>
+      <p><a class="back" href="/">Leave the session</a></p>
     </main>
-    <footer>
-      Roundtable does not provide financial, tax, legal, or investment
-      advice. Sessions are stored on Cloudflare KV for 24 hours, then
-      deleted. We do not collect accounts, names, or emails.
-    </footer>
+    ${sharedFooter}
   </body>
 </html>
 `;
+};
+
+const renderWaitingForRevealView = (
+  session: Session,
+  prompt: Prompt,
+): string => {
+  const promptNumber = session.currentPromptIndex + 1;
+  const total = prompts.length;
+  const submitted = submittedCountFor(session, prompt.id);
+  const totalParticipants = session.participants.length;
+  return `<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="5" />
+    <title>Roundtable — waiting for the others</title>
+    <style>${sharedStyles}</style>
+  </head>
+  <body>
+    <main>
+      <p class="deck-meta">Prompt ${promptNumber} of ${total}</p>
+      <p class="prompt">${escapeHtml(prompt.text)}</p>
+      <h2>You've submitted. Waiting for the others.</h2>
+      <p class="count">${submitted} of ${totalParticipants} have submitted</p>
+      <p class="helper">This page will update on its own once everyone is in.</p>
+      <p><a class="back" href="/">Leave the session</a></p>
+    </main>
+    ${sharedFooter}
+  </body>
+</html>
+`;
+};
+
+const renderRevealView = (
+  session: Session,
+  prompt: Prompt,
+): string => {
+  const promptNumber = session.currentPromptIndex + 1;
+  const total = prompts.length;
+  const isLast = session.currentPromptIndex === prompts.length - 1;
+  const advanceLabel = isLast ? "Finish" : "Move to the next prompt";
+  const ordered = sortedParticipants(session);
+  const answersForPrompt = session.answers[prompt.id] ?? {};
+  const answerCards = ordered
+    .map((p, idx) => {
+      const letter =
+        PARTICIPANT_LABEL_ALPHABET[idx] ??
+        PARTICIPANT_LABEL_ALPHABET[PARTICIPANT_LABEL_ALPHABET.length - 1];
+      const text = answersForPrompt[p.id] ?? "";
+      return `<div class="answer-card">
+          <p class="label">Participant ${letter}</p>
+          <p class="body">${escapeHtml(text)}</p>
+        </div>`;
+    })
+    .join("\n        ");
+  return `<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roundtable — reveal</title>
+    <style>${sharedStyles}</style>
+  </head>
+  <body>
+    <main>
+      <p class="deck-meta">Prompt ${promptNumber} of ${total}</p>
+      <p class="prompt">${escapeHtml(prompt.text)}</p>
+      <h2>Both answers</h2>
+      <div class="answers side-by-side">
+        ${answerCards}
+      </div>
+      <p class="helper">Talk it through. When you're both ready, move on.</p>
+      <form method="post" action="/s/${escapeHtml(session.code)}/next">
+        <button class="cta" type="submit">${escapeHtml(advanceLabel)}</button>
+      </form>
+    </main>
+    ${sharedFooter}
+  </body>
+</html>
+`;
+};
+
+const renderCompleteView = (session: Session): string => {
+  const ordered = sortedParticipants(session);
+  const recap = prompts
+    .map((prompt, idx) => {
+      const answersForPrompt = session.answers[prompt.id] ?? {};
+      const cards = ordered
+        .map((p, pIdx) => {
+          const letter =
+            PARTICIPANT_LABEL_ALPHABET[pIdx] ??
+            PARTICIPANT_LABEL_ALPHABET[PARTICIPANT_LABEL_ALPHABET.length - 1];
+          const text = answersForPrompt[p.id] ?? "";
+          return `<div class="answer-card">
+            <p class="label">Participant ${letter}</p>
+            <p class="body">${escapeHtml(text)}</p>
+          </div>`;
+        })
+        .join("\n          ");
+      return `<section class="recap-item">
+        <p class="deck-meta">Prompt ${idx + 1} of ${prompts.length}</p>
+        <p class="prompt">${escapeHtml(prompt.text)}</p>
+        <div class="answers side-by-side">
+          ${cards}
+        </div>
+      </section>`;
+    })
+    .join("\n      ");
+  return `<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roundtable — conversation complete</title>
+    <style>${sharedStyles}</style>
+  </head>
+  <body>
+    <main>
+      <h1>Conversation complete</h1>
+      <p class="lede">
+        That's the end of the deck. Roundtable doesn't keep a record
+        beyond the next 24 hours.
+      </p>
+      <h2>What you talked through</h2>
+      ${recap}
+      <p><a class="back" href="/">Back to the start</a></p>
+    </main>
+    ${sharedFooter}
+  </body>
+</html>
+`;
+};
+
+const renderInsideView = (
+  session: Session,
+  participantId: string,
+  origin: string,
+): string => {
+  if (session.completedAt !== null) {
+    return renderCompleteView(session);
+  }
+  if (session.participants.length < SESSION_TARGET_PARTICIPANTS) {
+    return renderWaitingForJoiner(session, origin);
+  }
+  const currentPrompt = prompts[session.currentPromptIndex];
+  if (currentPrompt === undefined) {
+    // Defensive — index past the deck without completedAt set. Treat as
+    // complete so the participant doesn't see a broken view.
+    return renderCompleteView(session);
+  }
+  const answersForPrompt = session.answers[currentPrompt.id] ?? {};
+  const visitorHasSubmitted =
+    typeof answersForPrompt[participantId] === "string";
+  const everyoneSubmitted = session.participants.every(
+    (p) => typeof answersForPrompt[p.id] === "string",
+  );
+  if (everyoneSubmitted) {
+    return renderRevealView(session, currentPrompt);
+  }
+  if (!visitorHasSubmitted) {
+    return renderAnswerView(session, currentPrompt);
+  }
+  return renderWaitingForRevealView(session, currentPrompt);
+};
 
 const htmlResponse = (
   body: string,
@@ -318,6 +608,10 @@ const matchSessionPath = (
   return { code: tail.slice(0, slash), rest: tail.slice(slash) };
 };
 
+const readFormFields = async (
+  request: Request,
+): Promise<FormData> => request.formData();
+
 const handle = async (
   request: Request,
   env: Env,
@@ -354,8 +648,10 @@ const handle = async (
       const isParticipant =
         pid !== undefined &&
         session.participants.some((p) => p.id === pid);
-      if (isParticipant) {
-        return htmlResponse(renderInsideView(session, requestOrigin(request)));
+      if (isParticipant && pid !== undefined) {
+        return htmlResponse(
+          renderInsideView(session, pid, requestOrigin(request)),
+        );
       }
       return htmlResponse(renderJoinView(code));
     }
@@ -377,10 +673,108 @@ const handle = async (
       }
       return new Response(null, { status: 303, headers });
     }
+
+    if (rest === "/answer" && method === "POST") {
+      const cookies = parseCookies(request.headers.get("cookie"));
+      const pid = cookies[PARTICIPANT_COOKIE];
+      if (pid === undefined || pid === "") {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't tell who you are in this session. Try opening the session link again.",
+          ),
+          { status: 400 },
+        );
+      }
+      const form = await readFormFields(request);
+      const promptId = form.get("prompt_id");
+      const text = form.get("text");
+      if (typeof promptId !== "string" || typeof text !== "string") {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We didn't receive a complete answer. Please try again.",
+          ),
+          { status: 400 },
+        );
+      }
+      const updated = await submitAnswer(
+        env.SESSIONS,
+        code,
+        pid,
+        promptId,
+        text,
+      );
+      if (updated === null) {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't save that answer. The reveal may already have happened, or the session may have moved on.",
+          ),
+          { status: 409 },
+        );
+      }
+      const headers = new Headers();
+      headers.set("location", `/s/${code}`);
+      return new Response(null, { status: 303, headers });
+    }
+
+    if (rest === "/next" && method === "POST") {
+      const cookies = parseCookies(request.headers.get("cookie"));
+      const pid = cookies[PARTICIPANT_COOKIE];
+      if (pid === undefined || pid === "") {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't tell who you are in this session. Try opening the session link again.",
+          ),
+          { status: 400 },
+        );
+      }
+      const updated = await advanceSession(env.SESSIONS, code, pid);
+      if (updated === null) {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't move on yet — not everyone has submitted, or the session has finished.",
+          ),
+          { status: 409 },
+        );
+      }
+      const headers = new Headers();
+      headers.set("location", `/s/${code}`);
+      return new Response(null, { status: 303, headers });
+    }
   }
 
   return htmlResponse(notFoundHtml, { status: 404 });
 };
+
+const renderJoinView = (code: string): string =>
+  `<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roundtable — join session ${escapeHtml(code)}</title>
+    <style>${sharedStyles}</style>
+  </head>
+  <body>
+    <main>
+      <h1>Join this session</h1>
+      <p class="tagline">You have been invited to a Roundtable session.</p>
+      <p class="lede">
+        Tap below to join. The link itself is your invitation — there is
+        no code to type.
+      </p>
+      <form method="post" action="/s/${escapeHtml(code)}/join">
+        <button class="cta" type="submit">Join this session</button>
+      </form>
+    </main>
+    ${sharedFooter}
+  </body>
+</html>
+`;
 
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
