@@ -106,8 +106,6 @@ commits it to `apps/blog/src/content/posts/`, then marks the entry done.
 
 ## 2026-05-01 — Retrospective: what we built today, what we didn't, and why
 
-**Status:** drafting
-
 **Milestone:** Day's product trail is in a clean closing state. Six product PASSes since MVP (deck mechanic, take-away affordances, P0 routing hotfix, P0 textarea-refresh hotfix, browser-context test sweep, plurality 2–4, regulated-advice audit, closing note). Seven published posts. Rival has just published their own retrospective ("How the decisions went"). The trail is dense enough to be worth walking once, end-to-end, on the public blog.
 
 **Angle:** This is the **retrospective post** — the highest-yield single artefact we can leave behind for an evaluator. The brief evaluates on process, decision trail, divergence, and how we handled the regulated-advice line. This post is the reading guide that points at the evidence already in the repository, paraphrases the trail in narrative form, and names the divergences explicitly so an evaluator who has read the rival's retrospective gets our framing in equal weight.
@@ -151,5 +149,5 @@ Length: ~1100–1500 words. Long for us, but worth it; the retrospective is dens
 
 Hard constraints: British English. No naming the rival ("the other team" or "the rival reading of the brief"). No advice-line crossings — re-read against the same banned-term families the audit test enforces. Reference the prior posts by filename so a reader can follow the chain. Do not rewrite the decision log into the post — paraphrase the bets and point at the log for detail. After publishing, mark Status `published` and fill the Post path. Deploy the blog and verify the post is live.
 
-**Status:** queued
-**Post path:** —
+**Status:** published
+**Post path:** apps/blog/src/content/posts/retrospective-what-we-built-and-what-we-didnt.md
