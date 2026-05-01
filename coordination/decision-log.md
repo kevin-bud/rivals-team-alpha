@@ -307,3 +307,44 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - Discipline-as-code generalises: any future Engineer working on this repo gets the rule enforced for them, regardless of what guidance they read.
 
 **Reversible?** Trivially. Removing the test, the audit doc, and the `data-disclaimer` attribute is one commit. We will not want to remove them — the test pays for itself the first time a copy change unintentionally crosses the line.
+
+---
+
+## 2026-05-01 06:50 — Plural depth: a shared closing sentence on the complete view
+
+**Context:** Rival has now shipped on three axes since MVP parity: a second conversation arc (breadth), a per-partner reflection step (depth), and names embedded in the printed PDF (PII polish). We have shipped on three of our own: take-away on our terms, plurality (2–4 participants), regulated-advice audit. The two candidates I logged at 06:40 for the next product slot were: (a) realtime/resilience (replace meta-refresh polling), and (b) a *plural* depth beat (a shared closing sentence everyone present jointly endorses, distinct from the rival's per-partner reflection). Picking (b).
+
+**Why (b) over (a):**
+- *Plural depth fits our identity.* Roundtable is "for two or more, together". The deck has been "I, then I, then I, then I, then I" — five private answers, five simultaneous reveals. Closing the session with a *we* beat is the natural shape we have not yet expressed. The rival's per-partner reflection is a *me* beat repeated; ours would be a *we* beat done once.
+- *Realtime would be invisible work.* The 5s polling lag is small, no user has complained. Investing the next slot on infrastructure rather than a visible product move would be the wrong shape this late in the day, and "we replaced meta-refresh with WebSockets" is not the kind of decision-trail evidence the brief evaluates well on. Defer.
+- *Plural depth is also distinct from the rival's depth move.* If we shipped a per-partner reflection step we would look derivative even if we did it slightly differently; shipping a *jointly-typed shared sentence* is a different product object — single string, last-write-wins, labelled with whose contribution is currently visible. The rival cannot trivially mirror this without re-architecting their two-person framing.
+
+**Choice:** Add a "closing note" — a single shared free-text field on the complete view. Any participant can write or revise it. The latest version is shown to everyone present (after refresh — we are not building realtime in this slot). It travels with the recap to clipboard and print. No-one is forced to use it; if it is empty, no closing-note section appears in the take-away artefacts.
+
+**Concrete scope:**
+- `Session.closingNote: string` (empty string by default).
+- `Session.closingNoteUpdatedBy: string | null` (the participant id of the last writer; null until someone writes).
+- `Session.closingNoteUpdatedAt: number | null` (epoch ms; null until someone writes).
+- Named export `setClosingNote(kv, code, participantId, text)`:
+  - Returns null if session not found.
+  - Returns null if participant not in session.
+  - Returns null if `session.completedAt === null` (cannot set closing note before deck completes — the act of deciding what to take away presupposes the conversation is over).
+  - Trims; caps text at 280 characters; rejects empty-after-trim *as a delete* — i.e. setting an empty string is allowed and clears the closing note. Distinguishing "I want to clear what's there" from "I haven't written anything yet" is worth supporting; the cap-at-280 is to keep the field a *sentence*, not an essay.
+  - Sets `closingNote = trimmed`, `closingNoteUpdatedBy = participantId`, `closingNoteUpdatedAt = Date.now()`. Writes with the existing 24-hour TTL. Returns the updated session.
+- New route `POST /s/:code/closing-note`: read `rt_pid`; read form field `text`; call `setClosingNote`; on success, 303 redirect to `/s/<code>`; on failure, render the existing-style error page.
+- The complete view (`renderCompleteView`) gains a new top section:
+  - Heading: "One last thing — together."
+  - Helper line: "Is there a sentence you'd like to take away from this conversation? Anyone here can write or revise it. Refresh to see updates from the others."
+  - A `<form method="post" action="/s/<code>/closing-note">` with a `<textarea name="text" maxlength="280" rows="2">` (pre-filled with the current `closingNote`), and a submit button "Save this sentence".
+  - Below the textarea: if `closingNoteUpdatedBy` is set, render "Last saved by Participant X at HH:MM" (HH:MM in the user's locale via inline JS, or just UTC HH:MM if simpler). If empty, render "Nothing saved yet."
+  - **No `<meta refresh>` on the complete view** — the textarea would be cleared exactly like the answer-view bug. The user reloads manually if they want to see partner edits. Document this in the helper line ("Refresh to see updates from the others.").
+- The recap section (everything below the closing-note section) renders as today, *plus*: if `closingNote` is non-empty, the recap shows it as a labelled block at the top of the recap (above the per-prompt blocks). The plain-text recap (`renderRecapText`) and the clipboard-copy script content are updated to include the closing note in the same shape: "Together — last saved by Participant X at HH:MM:\n<text>\n" before the per-prompt blocks. The print stylesheet keeps the closing-note section visible (it is part of the artefact participants want to keep).
+- The closing-note input section itself (heading + form + last-saved-label) is **hidden in print** via `@media print` (the printed recap doesn't need the input form; only the saved value). Use a dedicated wrapper element with a class that the existing print stylesheet can target.
+
+**Out of scope:**
+- Realtime / WebSockets / Durable Objects (deferred again).
+- Multiple closing notes / per-prompt reflections / per-participant takeaways. The point is a *single shared* sentence — that is the bet.
+- Locking / consensus mechanism. Last write wins. If two people write conflicting things, that is a feature: it surfaces a disagreement and prompts a discussion before they tap "Copy to clipboard".
+- A blog post — Orchestrator's call after PASS.
+
+**Reversible?** Yes — removing the closing-note section is one commit; the schema fields can be left in place even after removing the UI without breaking sessions in flight.

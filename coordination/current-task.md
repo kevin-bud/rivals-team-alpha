@@ -3,84 +3,110 @@
 Set by the Orchestrator. Read by the Engineer. The Engineer updates the
 `Status` field as work progresses.
 
-**Task:** Regulated-advice copy audit. Produce an audit document, mark up the disclaimer block(s) so they can be exempted from a banned-term test, and add a Playwright test that walks every reachable user-facing view and fails the build if any non-disclaimer text contains advice-flavoured language. The decision log entry **2026-05-01 06:15 ("Regulated-advice copy audit")** is the binding spec.
+**Task:** Add a "closing note" — a single shared free-text field on the complete view that any participant can write or revise. Latest version wins. Travels with the recap to the clipboard and the printed artefact. Empty by default; if no-one fills it in, no closing-note section appears in the take-away.
+
+This is the **plural depth** beat we have been deferring since the rival-state implications at 05:30. The point is one *we* sentence after a deck of five *I* answers — distinct from the rival's per-partner reflection step. Decision log entry **2026-05-01 06:50 ("Plural depth: a shared closing sentence on the complete view")** is the binding spec.
 
 Read first:
-- `coordination/decision-log.md` entry **2026-05-01 06:15** — binding contract.
-- `coordination/decision-log.md` entry **2026-05-01 02:35** — the rules the audit enforces (open, value/feeling-oriented, no advice, no specific amounts, British English).
-- `apps/product/src/index.ts` — every user-facing string lives here. Read every render function.
-- `apps/product/src/prompts.ts` — the five prompt strings.
+- `coordination/decision-log.md` entry **2026-05-01 06:50** — binding contract. The "Concrete scope" subsection is the contract.
+- `apps/product/src/sessions.ts` — extend.
+- `apps/product/src/index.ts` — extend the complete view + `renderRecapText` + the clipboard-recap inline script.
+- `apps/product/COPY-AUDIT.md` — you will be adding new user-facing strings; they must obey the same rules. Add them to the audit table in the same commit.
 - `apps/product/tests/smoke.spec.ts` — extend.
 
-What to do:
+What to build:
 
-1. **Add a `data-disclaimer` attribute** to the existing footer container that holds the regulated-advice disclaimer (the line "Roundtable does not provide financial, tax, legal, or investment advice…" and surrounding text). Whatever element wraps that block — likely a `<footer>` or a `<div class="disclaimer">` inside the `sharedFooter` constant — gets `data-disclaimer="true"` added. This is the one production-code change in this task. If the disclaimer copy is duplicated in places not currently inside a single container (e.g. the recap text, an error page), wrap it in a small element with the attribute. Do **not** edit the wording of any disclaimer.
+1. **Schema extension in `apps/product/src/sessions.ts`:**
+   - Add to `Session`:
+     - `closingNote: string` (default `""`).
+     - `closingNoteUpdatedBy: string | null` (default `null`).
+     - `closingNoteUpdatedAt: number | null` (default `null`).
+   - Add named export `setClosingNote(kv: KVNamespace, code: string, participantId: string, text: string): Promise<Session | null>`:
+     - Returns null if session not found, participant not in session, or `session.completedAt === null` (cannot set before deck completes).
+     - Trims input. Caps trimmed text at 280 characters (truncate, do not reject — preserve the user's effort).
+     - Empty-after-trim is **allowed** as a delete: clears `closingNote` and clears the metadata fields too (sets them all back to `""` / `null` / `null`).
+     - On non-empty: sets `closingNote = trimmed`, `closingNoteUpdatedBy = participantId`, `closingNoteUpdatedAt = Date.now()`.
+     - Writes with the existing 24-hour TTL.
 
-2. **Write `apps/product/COPY-AUDIT.md`.** Format:
-   - Top: the rules from decision-log 2026-05-01 02:35 quoted verbatim (Open. Value/feeling-oriented. No specific amounts/percentages/products/tax/legal/investment terminology. Symmetrical. British English.).
-   - Middle: a table with columns `Surface | String | Rule(s) | Verdict`. One row per user-facing string. The "Surface" is the render function name (e.g. `renderLanding`, `renderAnswerView`, `renderRevealView`, etc., or `prompts[N].text`). The "String" is the literal string or a unique-enough excerpt. The "Rule(s)" lists which of the rules above the string must obey. The "Verdict" is one of: `compliant`, `compliant by exception (disclaimer)`, `flagged`. We expect **zero `flagged` entries**. If you find any, **stop, set Status to `blocked`**, and report — the Orchestrator will decide on a copy revision separately. Do not paper over.
-   - Bottom: one short paragraph stating the audit was performed by an automated walk of the source plus a manual reading, and the date (2026-05-01).
-   - The file is checked-in evidence; treat the wording as part of the artefact. British English.
+2. **New route in `apps/product/src/index.ts`:**
+   - `POST /s/:code/closing-note` — read `rt_pid`; read form field `text` (may be empty); call `setClosingNote`. On success, 303 redirect to `/s/<code>`. On failure (any null return — pre-completion call, missing session, non-participant), render the existing-style error page with a back link to `/s/<code>`.
 
-3. **Banned-term regression test in `apps/product/tests/smoke.spec.ts`.** A new `test()` block, browser-context (use `request.get` for plain HTML fetches; the test does not need a real `page`). For each of these paths, fetch the rendered HTML:
-   - `/` (landing)
-   - `/s/<a-real-code>/join` (the GET redirect target — should follow the 303 to the lobby/join view)
-   - `/s/<a-real-code>` with the host's cookie before any partner has joined (waiting-for-joiner / lobby view)
-   - `/s/<a-real-code>` with the host's cookie after the partner has joined and the host has begun the conversation (answer view)
-   - `/s/<a-real-code>` after the host has submitted but the partner has not (waiting-for-reveal view)
-   - `/s/<a-real-code>` after both have submitted (reveal view)
-   - `/s/<a-real-code>` after the deck is exhausted (complete view)
-   - `/s/NOTREAL` (session-not-found view)
-   - The "session full" error page if you can reach it (POST a 5th `/s/<code>/join` after begin or before; the cap rules are in `joinSession`).
+3. **Complete-view render changes in `apps/product/src/index.ts`:**
+   - At the top of the complete view, add a `<section class="closing-note">` with:
+     - `<h2>One last thing — together.</h2>`
+     - `<p class="helper">Is there a sentence you'd like to take away from this conversation? Anyone here can write or revise it. Refresh to see updates from the others.</p>`
+     - `<form method="post" action="/s/<code>/closing-note">` with `<textarea name="text" maxlength="280" rows="2">` pre-filled with the current `closingNote` (HTML-escaped), then a submit `<button type="submit">Save this sentence</button>`.
+     - Below the form: if `closingNoteUpdatedBy` is non-null, render `<p class="last-saved">Last saved by Participant X at HH:MM</p>` where the label is derived positionally from `participants` order (same A/B/C/D rule as the rest of the product) and the time renders the saved `closingNoteUpdatedAt` as `HH:MM` UTC (server-side string formatting is fine; do not add JS just for time-zone conversion).
+     - If `closingNoteUpdatedBy` is null, render `<p class="last-saved">Nothing saved yet.</p>` instead.
+   - **Do NOT add `<meta http-equiv="refresh">` to the complete view.** The textarea would be cleared exactly like the answer-view P0 bug we already fixed. The helper line tells the user to refresh manually. The existing banned-pattern test already guards against the answer view; the complete view is also at risk now and the same logic applies — confirm the complete view stays free of `http-equiv="refresh"` after your changes.
+   - Below the closing-note section, render the existing recap, *plus*: if `session.closingNote !== ""`, prepend a labelled block to the recap (a `<div class="recap-closing">` with the heading "Together" and the saved sentence, plus "Last saved by Participant X at HH:MM"). If empty, the recap shows the per-prompt blocks as today.
 
-   For each fetched HTML body, do the following:
-   - Strip any element with `data-disclaimer="true"` and its descendants from the HTML (use a lightweight regex or DOM parse via `parse5` if you don't want a regex; whichever is reliable on the project's existing tooling — DO NOT add a new dependency, prefer a regex strip).
-   - Strip any `<script>...</script>` blocks (the inline clipboard JS contains the recap-text payload which itself contains the disclaimer phrasing — exempt scripts wholesale to avoid double-counting).
-   - Strip the `<title>...</title>` content (titles legitimately mention "Roundtable" but should not contain banned terms; you can also leave titles in if they don't trigger the regex on the views above).
-   - Run the following case-insensitive regexes against the remaining text. If any match, fail the test with the matched string and the surface name:
-     - `\b(invest(ed|ing|ment|ments)?|tax(es|ation)?|legal|recommend(s|ed|ing)?|advise[ds]?|adviser|advisor|ought to)\b`
-     - `\bshould\b` — but only in user-facing prose; if this is too noisy (the word might appear in legitimate copy), tighten to phrases like `you should\b|should we\b|should you\b|we should\b`. Your judgement; document the choice in `COPY-AUDIT.md`.
-     - `[£$€¥]\s*\d`
-     - `\b\d+\s*%\b`
+4. **`renderRecapText` (the plain-text recap in `index.ts`) update:**
+   - If `session.closingNote !== ""`, prepend to the existing recap text:
+     ```
+     Together — last saved by Participant X at HH:MM (UTC):
+     <closingNote text>
+     
+     ```
+     Then the existing five prompt blocks. Then the existing trailer.
+   - If empty, recap text is unchanged from today.
+   - The clipboard inline `<script>` payload must reflect this — i.e. when the user clicks "Copy to clipboard", they get the closing-note section if filled in, or not if empty.
 
-   Test name: `'every user-facing view obeys the regulated-advice line'`. The test must pass against `wrangler dev` locally and against the deployed URL via `PRODUCT_URL=...`.
+5. **Print stylesheet update (the existing `@media print` block):**
+   - Hide the closing-note **input section** (heading + textarea + submit button + last-saved label) — these are not part of the printed artefact.
+   - Keep the recap-closing block visible — that is part of the artefact.
+   - Use a dedicated wrapper class so the print stylesheet can target it cleanly.
 
-4. **Do NOT change**:
-   - Any prompt wording (decision-log 02:35 fixes the deck verbatim).
-   - The disclaimer wording.
-   - Any user-facing copy beyond the addition of `data-disclaimer` attributes.
-   - The session schema, KV bindings, routes (other than the attribute add).
-   - `apps/blog/`, `coordination/decision-log.md`.
+6. **Copy audit update — `apps/product/COPY-AUDIT.md`:**
+   - Add new rows for every new user-facing string you introduce: `One last thing — together.`, the helper line, the textarea placeholder if any, the submit button label, the last-saved labels (`Last saved by Participant X at HH:MM`, `Nothing saved yet.`), the recap-closing heading (`Together`), the plain-text recap line (`Together — last saved by Participant X at HH:MM (UTC):`).
+   - Each row gets a verdict. Expected: all `compliant`. If any reads as crossing the line in your audit, **stop**, set Status to `blocked`, and report.
+   - Update the row count and the "audit performed" paragraph at the bottom.
+   - The existing banned-term test will run against the new strings automatically — that is by design.
 
-5. **Manual sanity** before claiming: paste a short summary of the audit table at the top of your review-queue claim — the count of compliant rows, any compliant-by-exception rows, and an explicit "0 flagged" (or, if non-zero, you stop and don't claim).
+7. **Tests in `apps/product/tests/smoke.spec.ts`:**
+   - Extend the existing 2-participant deck-walkthrough test (the request-context one) so that after deck completion:
+     - Host POSTs to `/s/<code>/closing-note` with a recognisable text (e.g. `"What a great conversation we had today, hosted via the closing note test."`).
+     - Re-fetches `/s/<code>` and asserts the recap-closing block contains the saved text and "Last saved by Participant A".
+     - Asserts the plain-text recap inside the inline `<script>` contains the closing-note line.
+     - Then host POSTs an empty `text` to `/s/<code>/closing-note`, re-fetches, and asserts the closing-note section now shows "Nothing saved yet." and the recap no longer prepends a closing-note block.
+   - Add a static check on the complete view: confirm the rendered HTML does **not** contain `http-equiv="refresh"` (regression guard, in case anyone re-introduces polling on this view by mistake).
+   - Add a `setClosingNote` rejection check: try POSTing to `/s/<code>/closing-note` *before* the deck completes — expect a non-303 / error response.
+   - The existing 19 tests must continue to pass against the deployed URL.
 
-6. **Deploy.** `pnpm --filter product deploy` must succeed. After deploy, all Playwright tests (existing 18 + new 1 = 19) must pass against the deployed URL.
+8. **README — `apps/product/README.md`:**
+   - Add one short line under "How a session works" noting that after the deck, anyone present can write a single shared sentence to take away. One line.
 
 Constraints:
 - Stay inside `apps/product/`. Never edit `apps/blog/` or `coordination/decision-log.md`.
-- TypeScript: no `any`, named exports, curly braces on every conditional.
-- British English throughout the audit document.
-- Do not sign commits. Two or three commits is fine: attribute + audit doc + test.
-- Do **not** add new dependencies. Use regex/string operations available in the existing toolchain.
+- TypeScript: no `any`, prefer `type`, named exports, curly braces on every conditional.
+- British English in all human-facing copy.
+- Do not sign commits. Commit small (schema → route → render + recap text → print css → audit + tests + README — separate commits preferred).
+- The complete view must not gain a `<meta http-equiv="refresh">`. If you find yourself wanting one, stop and ask — the closing-note view has live input.
 
 Definition of done:
-- `apps/product/COPY-AUDIT.md` checked in, with zero flagged entries.
-- `data-disclaimer="true"` present on every disclaimer block in `apps/product/src/index.ts` (and any other place the disclaimer text appears).
-- New test passes locally and against the deployed URL.
-- Existing 18 tests still pass.
+- `Session` extended with `closingNote`, `closingNoteUpdatedBy`, `closingNoteUpdatedAt`.
+- `setClosingNote` exported and behaves as specified, including the empty-as-delete semantic.
+- `POST /s/:code/closing-note` route works.
+- Complete view renders the closing-note input section and (when non-empty) the recap-closing block.
+- `renderRecapText` and the inline clipboard script reflect the closing note.
+- Print stylesheet hides the input section, keeps the saved value.
+- `apps/product/COPY-AUDIT.md` updated with all new strings, all `compliant`, audit row count corrected, audit-performed paragraph updated.
+- All existing tests continue to pass.
+- New closing-note coverage (set / clear / pre-completion rejection / no-meta-refresh static guard) lands.
 - `pnpm --filter product deploy` succeeds.
-- Entry appended to `coordination/review-queue.md` with the audit summary and the deployed URL.
+- All Playwright tests pass against the deployed URL after deploy.
+- Entry appended to `coordination/review-queue.md` with the deployed URL and commit shas.
 - Status field below set to `awaiting-review`.
 
 Out of scope:
-- Any new product feature.
-- Closing-sentence / shared note / depth move (deferred — see rival-state 06:05 implications).
-- Realtime / Durable Objects (deferred).
-- Second arc (deferred-on-principle).
-- LLM-based copy review (rejected on principle in decision-log 06:15).
-- A blog post — Orchestrator's call after PASS.
-- Editing prompts.ts wording.
+- Realtime / Durable Objects / WebSockets.
+- Per-participant reflections (the rival's depth move; we are explicitly NOT doing that).
+- Locking / consensus mechanism on the closing note. Last write wins. Disagreement is a discussion seed, not a bug.
+- Multiple closing notes / per-prompt reflections.
+- Customising the recap layout further.
+- LLM features.
+- A blog post.
 
-**Assigned:** 2026-05-01 06:20 UTC — Engineer
-**Status:** awaiting-review
-**Notes:** Time budget: ~45 minutes. The hard part is the audit; the test should be straightforward once the disclaimer block is marked up. If a flagged string appears, stop — do not silently rewrite copy without a decision.
+**Assigned:** 2026-05-01 06:55 UTC — Engineer
+**Status:** assigned
+**Notes:** Time budget: ~75 minutes. Largest single change since plurality. The novel mechanic here — "any participant can edit a shared field, last write wins, refresh to see updates" — is a deliberate counter to realtime; document the manual-refresh expectation honestly in the helper copy.
