@@ -5,4 +5,7 @@ export default defineConfig({
   output: "server",
   adapter: cloudflare(),
   site: "https://example.workers.dev",
+  prerender: {
+    crawlLinks: false,
+  },
 });
