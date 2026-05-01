@@ -3,6 +3,7 @@ import {
   createSession,
   getSession,
   joinSession,
+  startSession,
   submitAnswer,
   type Participant,
   type Session,
@@ -15,7 +16,7 @@ type Env = {
 
 const PARTICIPANT_COOKIE = "rt_pid";
 const COOKIE_MAX_AGE = 60 * 60 * 24;
-const SESSION_TARGET_PARTICIPANTS = 2;
+const SESSION_MIN_PARTICIPANTS = 2;
 const PARTICIPANT_LABEL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const MAX_ANSWER_LENGTH = 2000;
 
@@ -150,12 +151,9 @@ const sharedStyles = `
   }
   .answers {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
     gap: 1rem;
     margin: 0 0 2rem;
-  }
-  @media (min-width: 32rem) {
-    .answers.side-by-side { grid-template-columns: 1fr 1fr; }
   }
   .answer-card {
     background: var(--card);
@@ -425,12 +423,50 @@ const submittedCountFor = (
   }, 0);
 };
 
-const renderWaitingForJoiner = (
+// Lobby — the pre-deck waiting room. Renders for every visitor while
+// session.startedAt is null, regardless of how many participants are in.
+// Shows the join code, the share URL, the count, the visitor's
+// positional label ("You are Participant A" / B / C / D), and a
+// host-vs-guest action area: a "Begin" form for the host once 2+
+// have joined, share-the-link copy for the host alone, and a
+// waiting-for-host line for non-host participants.
+const renderLobbyView = (
   session: Session,
+  participantId: string,
   origin: string,
 ): string => {
   const shareUrl = `${origin}/s/${session.code}/join`;
-  const count = session.participants.length;
+  const ordered = sortedParticipants(session);
+  const count = ordered.length;
+  const visitorIndex = ordered.findIndex((p) => p.id === participantId);
+  const visitorLabel =
+    visitorIndex >= 0 ? labelForIndex(visitorIndex) : "Participant";
+  const host = ordered[0];
+  const isHost = host !== undefined && host.id === participantId;
+  const enoughToBegin = count >= SESSION_MIN_PARTICIPANTS;
+
+  let countLine: string;
+  if (count === 1) {
+    countLine = `${count} here. Share the link with the others.`;
+  } else {
+    countLine = `${count} here.`;
+  }
+
+  let actionBlock: string;
+  if (isHost && enoughToBegin) {
+    actionBlock = `<form method="post" action="/s/${escapeHtml(session.code)}/begin">
+        <button class="cta" type="submit">Begin the conversation</button>
+      </form>
+      <p class="helper">Tap when everyone you're inviting is in. You can begin with two and others won't be able to join after.</p>`;
+  } else if (isHost) {
+    actionBlock = `<p class="placeholder">
+        Share the link with the others. Two are needed before the
+        conversation begins.
+      </p>`;
+  } else {
+    actionBlock = `<p class="placeholder">Waiting for the host to begin.</p>`;
+  }
+
   return `<!doctype html>
 <html lang="en-GB">
   <head>
@@ -443,13 +479,12 @@ const renderWaitingForJoiner = (
   <body>
     <main>
       <h1>You are in</h1>
-      <p class="tagline">Share this code or link with the other person.</p>
+      <p class="tagline">Share this code or link with the others.</p>
       <p class="code">${escapeHtml(session.code)}</p>
       <a class="share-url" href="${escapeHtml(shareUrl)}">${escapeHtml(shareUrl)}</a>
-      <p class="count">${count} of ${SESSION_TARGET_PARTICIPANTS} here</p>
-      <p class="placeholder">
-        Prompts coming next — partner needs to join to continue.
-      </p>
+      <p class="count">${escapeHtml(countLine)}</p>
+      <p class="helper">You are ${escapeHtml(visitorLabel)}.</p>
+      ${actionBlock}
       <p><a class="back" href="/">Back to the start</a></p>
     </main>
     ${sharedFooter}
@@ -479,7 +514,7 @@ const renderAnswerView = (
       <form method="post" action="/s/${escapeHtml(session.code)}/answer">
         <input type="hidden" name="prompt_id" value="${escapeHtml(prompt.id)}" />
         <textarea name="text" maxlength="${MAX_ANSWER_LENGTH}" rows="6" required placeholder="Take your time. There's no right answer."></textarea>
-        <p class="helper">Your partner won't see this until they've also submitted.</p>
+        <p class="helper">The others won't see this until everyone has submitted.</p>
         <button class="cta" type="submit">Submit privately</button>
       </form>
       <p><a class="back" href="/">Leave the session</a></p>
@@ -554,7 +589,7 @@ const renderRevealView = (
       <p class="deck-meta">Prompt ${promptNumber} of ${total}</p>
       <p class="prompt">${escapeHtml(prompt.text)}</p>
       <h2>Both answers</h2>
-      <div class="answers side-by-side">
+      <div class="answers">
         ${answerCards}
       </div>
       <p class="helper">Talk it through. When you're both ready, move on.</p>
@@ -585,7 +620,7 @@ const renderCompleteView = (session: Session): string => {
       return `<section class="recap-item">
         <p class="deck-meta">Prompt ${idx + 1} of ${prompts.length}</p>
         <p class="prompt">${escapeHtml(prompt.text)}</p>
-        <div class="answers side-by-side">
+        <div class="answers">
           ${cards}
         </div>
       </section>`;
@@ -685,8 +720,10 @@ const renderInsideView = (
   if (session.completedAt !== null) {
     return renderCompleteView(session);
   }
-  if (session.participants.length < SESSION_TARGET_PARTICIPANTS) {
-    return renderWaitingForJoiner(session, origin);
+  // Until the host begins, everyone sits in the lobby — regardless of
+  // count. The lobby itself renders the per-visitor host-vs-guest UI.
+  if (session.startedAt === null) {
+    return renderLobbyView(session, participantId, origin);
   }
   const currentPrompt = prompts[session.currentPromptIndex];
   if (currentPrompt === undefined) {
@@ -849,6 +886,37 @@ const handle = async (
       if (minted) {
         headers.append("set-cookie", buildParticipantCookie(id));
       }
+      return new Response(null, { status: 303, headers });
+    }
+
+    if (rest === "/begin" && method === "POST") {
+      const cookies = parseCookies(request.headers.get("cookie"));
+      const pid = cookies[PARTICIPANT_COOKIE];
+      if (pid === undefined || pid === "") {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't tell who you are in this session. Try opening the session link again.",
+          ),
+          { status: 400 },
+        );
+      }
+      const updated = await startSession(env.SESSIONS, code, pid);
+      if (updated === null) {
+        const exists = await getSession(env.SESSIONS, code);
+        if (exists === null) {
+          return htmlResponse(notFoundHtml, { status: 404 });
+        }
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't begin the conversation. Only the host can start, and at least two people need to be here.",
+          ),
+          { status: 409 },
+        );
+      }
+      const headers = new Headers();
+      headers.set("location", `/s/${code}`);
       return new Response(null, { status: 303, headers });
     }
 
