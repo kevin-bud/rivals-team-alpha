@@ -181,6 +181,80 @@ const sharedStyles = `
     border-bottom: 1px solid var(--border);
   }
   .recap-item:last-child { border-bottom: 0; }
+  .takeaway {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  .takeaway-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0 0 2rem;
+  }
+  .takeaway-actions button {
+    font: inherit;
+    font-size: 1rem;
+    padding: 0.65rem 1.2rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .takeaway-actions button:hover,
+  .takeaway-actions button:focus {
+    background: var(--accent);
+    color: var(--paper);
+    outline: none;
+  }
+  .copy-buffer {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  @media print {
+    :root {
+      --ink: #000;
+      --paper: #fff;
+      --accent: #000;
+      --muted: #333;
+      --card: #fff;
+      --border: #999;
+    }
+    html, body {
+      background: #fff;
+      color: #000;
+    }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      margin: 1.5cm;
+    }
+    main {
+      max-width: none;
+      padding: 0;
+    }
+    form,
+    .takeaway,
+    .takeaway-actions,
+    a.back,
+    .copy-buffer {
+      display: none !important;
+    }
+    .recap-item {
+      page-break-inside: avoid;
+    }
+    .answer-card {
+      border: 1px solid #999;
+    }
+    footer {
+      border-top: 1px solid #999;
+      color: #000;
+      margin-top: 2rem;
+    }
+  }
 `;
 
 const escapeHtml = (s: string): string =>
@@ -297,6 +371,43 @@ const renderActionErrorHtml = (code: string, message: string): string =>
 // not store the label.
 const sortedParticipants = (session: Session): Array<Participant> =>
   [...session.participants].sort((a, b) => a.joinedAt - b.joinedAt);
+
+const labelForIndex = (idx: number): string => {
+  const letter =
+    PARTICIPANT_LABEL_ALPHABET[idx] ??
+    PARTICIPANT_LABEL_ALPHABET[PARTICIPANT_LABEL_ALPHABET.length - 1];
+  return `Participant ${letter}`;
+};
+
+// Plain-text recap of a completed session. Pure function — used both for
+// the clipboard-copy payload on the complete view and for any future
+// take-away surface. Newlines are real `\n`, not HTML.
+export const renderRecapText = (session: Session): string => {
+  const ordered = sortedParticipants(session);
+  const blocks = prompts.map((prompt, idx) => {
+    const answersForPrompt = session.answers[prompt.id] ?? {};
+    const lines = ordered.map((p, pIdx) => {
+      const label = labelForIndex(pIdx);
+      const raw = answersForPrompt[p.id];
+      const answer =
+        typeof raw === "string" && raw.trim() !== "" ? raw : "(no answer)";
+      return `${label}: ${answer}`;
+    });
+    return [`Prompt ${idx + 1}: ${prompt.text}`, ...lines].join("\n");
+  });
+  const completedIso =
+    session.completedAt !== null
+      ? new Date(session.completedAt).toISOString()
+      : new Date().toISOString();
+  const footer = `Generated ${completedIso} from a Roundtable session. Roundtable does not provide financial, tax, legal, or investment advice.`;
+  return [
+    "Roundtable — conversation recap",
+    "",
+    blocks.join("\n\n"),
+    "",
+    footer,
+  ].join("\n");
+};
 
 const submittedCountFor = (
   session: Session,
@@ -424,12 +535,9 @@ const renderRevealView = (
   const answersForPrompt = session.answers[prompt.id] ?? {};
   const answerCards = ordered
     .map((p, idx) => {
-      const letter =
-        PARTICIPANT_LABEL_ALPHABET[idx] ??
-        PARTICIPANT_LABEL_ALPHABET[PARTICIPANT_LABEL_ALPHABET.length - 1];
       const text = answersForPrompt[p.id] ?? "";
       return `<div class="answer-card">
-          <p class="label">Participant ${letter}</p>
+          <p class="label">${labelForIndex(idx)}</p>
           <p class="body">${escapeHtml(text)}</p>
         </div>`;
     })
@@ -468,12 +576,9 @@ const renderCompleteView = (session: Session): string => {
       const answersForPrompt = session.answers[prompt.id] ?? {};
       const cards = ordered
         .map((p, pIdx) => {
-          const letter =
-            PARTICIPANT_LABEL_ALPHABET[pIdx] ??
-            PARTICIPANT_LABEL_ALPHABET[PARTICIPANT_LABEL_ALPHABET.length - 1];
           const text = answersForPrompt[p.id] ?? "";
           return `<div class="answer-card">
-            <p class="label">Participant ${letter}</p>
+            <p class="label">${labelForIndex(pIdx)}</p>
             <p class="body">${escapeHtml(text)}</p>
           </div>`;
         })
@@ -487,6 +592,11 @@ const renderCompleteView = (session: Session): string => {
       </section>`;
     })
     .join("\n      ");
+  // JSON-encode the plain-text recap so quotes and newlines survive the
+  // drop into <script>. Escape `</` defensively so user content can't
+  // break out of the script tag.
+  const recapText = renderRecapText(session);
+  const recapLiteral = JSON.stringify(recapText).replace(/<\//g, "<\\/");
   return `<!doctype html>
 <html lang="en-GB">
   <head>
@@ -504,9 +614,65 @@ const renderCompleteView = (session: Session): string => {
       </p>
       <h2>What you talked through</h2>
       ${recap}
+      <p class="takeaway">
+        Sessions disappear after 24 hours. If you'd like to keep this
+        conversation, you can copy it to your clipboard or print this
+        page from your browser.
+      </p>
+      <div class="takeaway-actions">
+        <button id="copy-recap" type="button">Copy to clipboard</button>
+        <button id="print-recap" type="button">Print this page</button>
+      </div>
+      <textarea id="copy-recap-buffer" class="copy-buffer" readonly aria-hidden="true" tabindex="-1"></textarea>
       <p><a class="back" href="/">Back to the start</a></p>
     </main>
     ${sharedFooter}
+    <script>
+      (function () {
+        var recapText = ${recapLiteral};
+        var btn = document.getElementById("copy-recap");
+        var printBtn = document.getElementById("print-recap");
+        var buffer = document.getElementById("copy-recap-buffer");
+        if (printBtn) {
+          printBtn.addEventListener("click", function () {
+            window.print();
+          });
+        }
+        if (!btn) { return; }
+        var defaultLabel = btn.textContent;
+        function flash(label) {
+          btn.textContent = label;
+          setTimeout(function () { btn.textContent = defaultLabel; }, 1500);
+        }
+        function fallbackCopy() {
+          if (!buffer) { return false; }
+          buffer.value = recapText;
+          buffer.removeAttribute("aria-hidden");
+          buffer.focus();
+          buffer.select();
+          var ok = false;
+          try {
+            ok = document.execCommand("copy");
+          } catch (e) {
+            ok = false;
+          }
+          buffer.setAttribute("aria-hidden", "true");
+          buffer.blur();
+          return ok;
+        }
+        btn.addEventListener("click", function () {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(recapText).then(function () {
+              flash("Copied");
+            }, function () {
+              if (fallbackCopy()) { flash("Copied"); } else { flash("Copy failed"); }
+            });
+          } else {
+            if (fallbackCopy()) { flash("Copied"); } else { flash("Copy failed"); }
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
 `;
