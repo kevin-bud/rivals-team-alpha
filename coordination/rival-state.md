@@ -158,3 +158,36 @@ The other seven posts are unchanged.
 - **Note for the next decision moment:** the rival has now made four moves since MVP parity — breadth (a second arc), depth (per-partner reflection), cosmetic polish (names-on-PDF), and an unchanged single-device, two-person base. We have made three on our terms — take-away, plurality (2–4), regulated-advice audit. Two clear axes remain candidates for our next move: (a) realtime/resilience (replace the meta-refresh polling), (b) a *plural* depth beat (a shared closing sentence everyone present jointly endorses, distinct from the rival's per-partner reflection). Neither is forced by this rival check; both remain teed up for the next `/cycle`.
 
 **Decision implication for this moment:** none. Audit post is queued. Writer is the next hand-off.
+
+---
+
+## 2026-05-01 07:20 — Seventh rival check (post-closing-note PASS)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** Landing page **unchanged** since the 06:40 check. Same two arcs, same one-device-two-people framing, same disclaimers, same names-on-PDF tagline. They have not touched the product surface in the last 40 minutes.
+
+**Recent posts:** One new post since 06:40:
+- *How the decisions went* (Fri 01 May 2026) — **NEW**. A *retrospective* — "examining the bets made on Common Ground, how they evolved, and what the outcomes reveal about the project's trajectory." This is a meaningfully different kind of post from the prior eight; it is the closing-arc artefact a process-evaluated brief actively rewards.
+
+**Implications:**
+
+This is the most important signal of the day. The rival has stopped shipping product changes and started writing *meta* — a retrospective on the day's decisions. Two readings, both probably true:
+1. *They are winding down.* Eight posts plus a retrospective is a coherent narrative envelope for a one-day hackathon. The brief evaluates on decision trail, and a retrospective is the highest-yield single artefact for that question.
+2. *They are claiming the framing.* If we don't write one and they do, the only retrospective an evaluator reads will be theirs — including their account of "where we and the rival diverged". Their account will be honest but it will be theirs. We owe an evaluator a comparable artefact that tells the same story from our side.
+
+**Does this change our priorities?** Yes — it changes the *next* move. Our just-shipped closing note has a queued post. The Writer will draft and publish that next. After that, the next blog-queue entry should be **our own retrospective**, not another product feature. We have shipped enough product today to have a decision trail worth retrospectively walking — six product PASSes since MVP plus seven published posts plus a copy audit; the trail will read coherently end-to-end.
+
+**Concrete plan for the next two hand-offs:**
+1. Writer drafts the closing-note post (currently queued, will be dispatched next).
+2. After that PASS-post pair settles, the Orchestrator queues a retrospective post on the blog-queue (Orchestrator action), then hands to Writer to draft it. The retrospective should walk the day's decision trail in chronological order, name the bets we made, the bets we deliberately did not match, the two P0 bugs we shipped and what each one taught us, and where the divergence with the other team has settled.
+3. **No new Engineer task is assigned in the meantime.** The product is in a good closing state. Adding another feature now would obscure the retrospective rather than strengthen it.
+
+**Where the rival check leaves the option set for after the retrospective:**
+- (a) Realtime / resilience — still deferred, still defensible to defer. The retrospective is a better next move than realtime.
+- (b) Another product feature on a third axis — possible if there is one with strong on-strategy reasoning, but we should require a much higher bar at this point in the day for new product scope.
+- (c) Stop, declare done, let the trail speak. Reasonable.
+
+I am explicitly not committing to (b) or (c) in this entry. The Writer drains first, then the Orchestrator decides at the next `/cycle`.
+
+**Decision implication for this moment:** I am noting in the trail (here, not in the decision log) that **the next blog-queue entry I add will be a retrospective**, not a product-feature post. This is a deliberate prioritisation prompted by the rival's retrospective landing first. The decision-log entry that records this prioritisation will be written when I queue the entry, not in advance.
