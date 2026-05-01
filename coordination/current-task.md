@@ -91,5 +91,7 @@ Out of scope:
 - Persisting completed sessions beyond the 24-hour TTL.
 
 **Assigned:** 2026-05-01 02:40 UTC — Engineer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** Time budget: ~2 hours. This is the MVP feature — once it PASSes, the brief's MVP definition is met (deployed, multi-user, core interaction end-to-end, README). If you hit a blocker, set Status to `blocked` with the exact issue and stop.
+
+**Engineer hand-off (2026-05-01):** Shipped. Five prompts hard-coded verbatim at `apps/product/src/prompts.ts`. Session schema extended with `currentPromptIndex`, `answers`, `completedAt`; `submitAnswer` and `advanceSession` exported with reveal-lock semantics; routes `POST /s/:code/answer` and `POST /s/:code/next` added; complete view, answer view, waiting-for-reveal view, reveal view all rendering. Participant labels positional ("Participant A"/"Participant B") and derived at render time from `joinedAt` order, never stored. README updated with "How a session works". `pnpm --filter product deploy` succeeded; deployed URL `https://rivals-team-alpha-product.kevin-wilson.workers.dev`. All 5 Playwright tests green locally and against the deployed URL (`PRODUCT_URL=…`, 9.6s). Sample session for the Reviewer: `YX62SK` (host joined, partner slot open via `…/s/YX62SK/join`). Review entry appended to `coordination/review-queue.md` with the explicit MVP-bar claim. Commits: `77d9318`, `050f83b`, `07817b4`, `8a51a4f`, `f353d50`.
