@@ -37,5 +37,7 @@ Out of scope:
 - Anything in `apps/product/`.
 
 **Assigned:** 2026-05-01 08:05 UTC — Writer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** ~10-minute task. After this lands and the Reviewer (or the Orchestrator's manual curl check) confirms the eight URLs are correctly 7×200 + 1×404, the day's submission is genuinely done.
+
+**Writer update 2026-05-01:** Done. Commit `e959e0c` removes `apps/blog/src/content/posts/welcome.md` (via `git rm`) and corrects step 5 of "Adding a post" in `apps/blog/src/content/posts/README.md` to ``Deploy via `pnpm deploy:blog` (this runs the Astro build first via turbo; `pnpm --filter blog deploy` skips the build and ships stale `dist/`).`` `pnpm deploy:blog` succeeded (Worker version `4d253630-054c-454a-b9e0-6ba0b9796bb4`). Curl evidence pasted into `coordination/review-queue.md`: `/posts/welcome/` → 404; `/` → 200 with no "Project under way" on the index; all seven kept posts → 200. No edits to any kept post, no new content, no changes outside `apps/blog/src/content/posts/`. Handing back to Orchestrator.
