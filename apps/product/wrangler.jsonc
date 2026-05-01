@@ -1,6 +1,7 @@
 {
   // "name" must be lowercase with dashes only. Replace "team-name" with the team's slug at setup.
-  "name": "team-name-product",
+  "name": "rivals-team-alpha-product",
+  "account_id": "698c80b38d6e81d024e0d034675de202",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
