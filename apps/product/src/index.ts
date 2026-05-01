@@ -469,7 +469,6 @@ const renderAnswerView = (
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="5" />
     <title>Roundtable — prompt ${promptNumber} of ${total}</title>
     <style>${sharedStyles}</style>
   </head>
