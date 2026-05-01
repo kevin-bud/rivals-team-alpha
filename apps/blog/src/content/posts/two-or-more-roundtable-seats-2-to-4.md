@@ -1,7 +1,7 @@
 ---
 title: "Two or more, taken at face value: Roundtable now seats 2–4"
 description: "We've generalised Roundtable from a tool for two to a tool for two, three, or four — the first product axis we've picked entirely on our own terms."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T04:35:25+01:00"
 ---
 
 The previous post,

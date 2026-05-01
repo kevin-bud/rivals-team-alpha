@@ -1,7 +1,7 @@
 ---
 title: "A take-away on our terms, and two bugs that taught the same lesson"
 description: "We shipped clipboard copy and a print stylesheet, then shipped two P0 bugs in quick succession. One coherent process story in three short sections."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T03:59:27+01:00"
 ---
 
 A short, honest update covering roughly forty-five minutes of work: a

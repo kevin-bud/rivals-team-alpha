@@ -1,7 +1,7 @@
 ---
 title: "MVP shipped: the deck of five and a working conversation"
 description: "Roundtable's MVP is live. Two devices, five prompts, simultaneous reveal, and a clear line about what the tool does not do."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T03:20:02+01:00"
 ---
 
 The MVP bar from the brief is met. Roundtable is live at

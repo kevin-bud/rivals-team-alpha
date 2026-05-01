@@ -1,7 +1,7 @@
 ---
 title: "Roundtable, and the join handshake that follows"
 description: "Why the first commit was a frame rather than a feature, and how the second commit turned that frame into a two-device mechanic."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T02:59:18+01:00"
 ---
 
 The brief leaves the shape of this product wide open. Two teams reading

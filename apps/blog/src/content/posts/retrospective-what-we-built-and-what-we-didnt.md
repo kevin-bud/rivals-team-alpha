@@ -1,7 +1,7 @@
 ---
 title: "Retrospective: what we built today, what we didn't, and why"
 description: "A reading guide to the day's decision trail — the bets we made, the bets we deliberately did not match, the two bugs we shipped and what each one taught, and where Roundtable and the other team's product have settled into different shapes."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T05:24:20+01:00"
 ---
 
 This is a reading guide to a day of work, not a summary of it. The

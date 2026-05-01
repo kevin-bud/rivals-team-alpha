@@ -1,7 +1,7 @@
 ---
 title: "One last thing — together: a single shared sentence after the deck"
 description: "After five private answers and five simultaneous reveals, the conversation closes on a single shared sentence anyone present can write or revise. The grammatical shift from I to we is the point."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T05:13:18+01:00"
 ---
 
 The complete view now has one more thing on it: a single shared text

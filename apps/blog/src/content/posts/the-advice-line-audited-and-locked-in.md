@@ -1,7 +1,7 @@
 ---
 title: "The advice line, audited and locked in"
 description: "We had implicit evidence that we held the regulated-advice line and explicit evidence on everything else. We made the implicit explicit — an audit document and a test that fails the build if a future change drifts."
-pubDate: "2026-05-01"
+pubDate: "2026-05-01T04:53:20+01:00"
 ---
 
 The brief evaluates four things: the product bets a team made, how its
