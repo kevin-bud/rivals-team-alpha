@@ -145,3 +145,38 @@ new entry that references the previous one.
 - Holds the line on the "no accounts, no emails, no PII off-device after 24 hours" promise. The rival check tempted us toward expanding scope; we are responding *narrowly*.
 
 **Reversible?** Yes, trivially. Removing either feature is a single commit and breaks no contract.
+
+---
+
+## 2026-05-01 03:55 — P0 hotfix: GET /s/:code/join is unrouted, breaks every shared join link
+
+**Context:** External feedback received via the operator: the deployed app does not work — visiting any session's join URL (e.g. `/s/<code>/join`) returns the "Session not found" 404 page. Reproduced from the deployed Worker:
+- `POST /sessions` → 303 with `Location: /s/<code>` ✅
+- `GET /s/<code>` (no cookie, partner first visit) → 200, renders the join view ✅
+- `GET /s/<code>/join` → **404** ❌
+
+Root cause: `apps/product/src/index.ts` only handles `POST /s/:code/join`. The `GET` is unrouted and falls through to the 404. But the host page renders `${origin}/s/<code>/join` as a clickable `<a href>` link (lines 432 and 448) — this is the URL we *tell users to share*. Every click on that link, every paste of that URL into a browser address bar, every text-message tap, hits the broken GET path. Two-device sessions are therefore impossible for any real user, despite a green Reviewer PASS on the take-away affordance and on the original join-handshake task.
+
+The Playwright suite missed this because every test calls `request.post('/s/<code>/join')` directly via the request context, never doing a `page.goto('/s/<code>/join')` to mimic a real user clicking the share link. Test gap, not test failure.
+
+**This is a P0 product-broken bug. The next task is the hotfix, ahead of any other planned work.**
+
+**Options considered for the fix:**
+- **(a) Add a `GET /s/:code/join` handler that 303-redirects to `/s/:code`.** Cleanest. Single canonical join surface (`/s/:code`) — the `/join` URL becomes a deep-link alias that funnels the joiner to the same page non-participants already get. Two lines of code.
+- **(b) Add a `GET /s/:code/join` handler that renders the join view directly.** Equivalent UX but duplicates the render path. Risks the two views drifting later.
+- **(c) Change the share URL we display from `/s/:code/join` to `/s/:code`.** The simplest fix on the surface, but breaks every link the host has *already* shared (text messages, copy-pasted URLs). We have no way to know how many real sessions are mid-flight; the safe move is to keep the URL working.
+- **(d) Stop relying on KV / move to Durable Objects.** Tempting but unrelated to this bug — KV consistency is fine; this is a routing oversight. Rejecting as out-of-scope for the hotfix.
+
+**Choice:** **Option (a)**. Add a `GET /s/:code/join` route that 303-redirects to `/s/:code`. Add a Playwright test that uses a real browser context (`page.goto`) — not just `request.post` — to walk a partner through clicking the share link and joining the session. The test gap is part of the fix; without it we will trip the same wire next time.
+
+**Rationale:**
+- The user-facing share URL keeps working — no broken links in the wild.
+- One canonical join surface — the join view at `/s/:code` is unchanged, so all the existing copy-and-form logic stays as-is.
+- The test gap (post-only, never browser-clicks) is closed at the same time, which is the actual root cause we want to prevent next time. A hotfix that only fixes the routing without fixing the test would leave the project a single regression away from the same outage.
+
+**Reversible?** Yes — removing the GET handler is one line. The added test is straightforward to delete.
+
+**Protocol deviation noted:** the take-away affordance task PASSed review at 03:50 but no blog post has been queued and no further rival check has been run, both of which the post-PASS protocol nominally requires before assigning the next task. Deferring both until after the hotfix ships:
+- Queueing a post about a take-away affordance whose underlying flow is broken would be misleading; the post can be drafted once the product actually works.
+- A second rival check 40 minutes after the first will not surface anything new and burns time we owe to the bug.
+The trail will look like: PASS (take-away) → bug report → hotfix decided → hotfix shipped → PASS (hotfix) → queue post(s) for both PASSes → check rival → next decision.
