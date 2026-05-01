@@ -5,7 +5,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "37dd7af6aae54de999a4f764a05e55b0",
+      "preview_id": "b879e0e7df454924a0c3a28417d0fb75"
+    }
+  ]
   // Dev ports (incl. the Node inspector port) are passed as CLI flags from
   // the `dev` script in package.json so they can be overridden via
   // PRODUCT_PORT / PRODUCT_INSPECTOR_PORT env vars. The default inspector
