@@ -3,6 +3,7 @@ import {
   createSession,
   getSession,
   joinSession,
+  setClosingNote,
   startSession,
   submitAnswer,
   type Participant,
@@ -983,6 +984,45 @@ const handle = async (
           renderActionErrorHtml(
             code,
             "We couldn't move on yet — not everyone has submitted, or the session has finished.",
+          ),
+          { status: 409 },
+        );
+      }
+      const headers = new Headers();
+      headers.set("location", `/s/${code}`);
+      return new Response(null, { status: 303, headers });
+    }
+
+    if (rest === "/closing-note" && method === "POST") {
+      const cookies = parseCookies(request.headers.get("cookie"));
+      const pid = cookies[PARTICIPANT_COOKIE];
+      if (pid === undefined || pid === "") {
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't tell who you are in this session. Try opening the session link again.",
+          ),
+          { status: 400 },
+        );
+      }
+      const form = await readFormFields(request);
+      const text = form.get("text");
+      const textValue = typeof text === "string" ? text : "";
+      const updated = await setClosingNote(
+        env.SESSIONS,
+        code,
+        pid,
+        textValue,
+      );
+      if (updated === null) {
+        const exists = await getSession(env.SESSIONS, code);
+        if (exists === null) {
+          return htmlResponse(notFoundHtml, { status: 404 });
+        }
+        return htmlResponse(
+          renderActionErrorHtml(
+            code,
+            "We couldn't save that closing note. The conversation may not have finished yet.",
           ),
           { status: 409 },
         );
