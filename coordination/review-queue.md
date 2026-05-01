@@ -200,3 +200,56 @@ Other gates:
 7. **Code-surface review.** The new branch sits at `apps/product/src/index.ts` lines 825–836, immediately before the existing POST branch on the `/join` rest-path. It runs **before any session lookup** — no `getSession`, no cookie work, no KV reads — pure URL alias returning `new Response(null, { status: 303, headers: { location: \`/s/${code}\` } })`. Decision-log 2026-05-01 03:55 option (a) implemented exactly as specified.
 
 P0 bug fixed live; the regression-prone test gap is closed.
+
+---
+
+## 2026-05-01 — P0 hotfix #2: meta refresh removed from answer view (textarea no longer wipes)
+
+**Commits:** `5642599` (deletion of the `<meta http-equiv="refresh" content="5" />` line on `renderAnswerView`), `32c8973` (two new Playwright tests).
+**Deployed URL:** https://rivals-team-alpha-product.kevin-wilson.workers.dev — Worker version ID `fa5b9f6e-b94f-4d97-a866-9316213f1fd6`.
+
+**What was broken:** External user feedback ("any text types in it clears every few seconds"). Per decision-log entry 2026-05-01 04:20, `apps/product/src/index.ts` had `<meta http-equiv="refresh" content="5" />` on three views, including the answer view (`renderAnswerView`, formerly line 472). The browser navigated to itself every five seconds, the form was rebuilt empty, and any in-progress typing was lost. Real users could not complete a prompt unless they typed and submitted in under five seconds.
+
+**What changed (option (a) from decision-log 2026-05-01 04:20):**
+- Deleted exactly one line — the `<meta http-equiv="refresh" content="5" />` inside `renderAnswerView`. The two other refresh tags — `renderWaitingForJoiner` (still on line 439) and `renderWaitingForRevealView` (now on line 506) — are **unchanged**. Polling is correct on those views: they have no input to destroy and need to detect partner-state changes.
+- No JS-based polling, no localStorage persistence, no Durable Objects, no WebSockets, no new state endpoint. All of those were explicitly rejected in the decision-log. Net diff: one line removed.
+- No schema change. No new routes. No copy revision. No CSS or HTML structural change beyond the deletion. `apps/blog/` untouched. `coordination/decision-log.md` untouched.
+
+**Test gap closed (the load-bearing part of this task):**
+- New test "answer view HTML must not contain a meta refresh (regression guard)" — static one-line assertion: `expect(answerHtml).not.toContain('http-equiv="refresh"')` after walking host + partner join so the inside view is the answer view (asserts `Prompt 1 of 5` and `prompt_id="values-enough"` first). Cheap, definitive, fires regardless of timing.
+- New test "typed text in the answer-view textarea survives longer than the old refresh interval" — real `browser.newContext()` for both host and partner. Host clicks "Start a session" on the landing page, partner navigates to the share URL and clicks "Join this session", host then navigates to `/s/<code>` and fills the textarea with `"Lorem ipsum dolor sit amet, consectetur adipiscing elit."`. `await hostPage.waitForTimeout(6000)` — longer than the old 5-second refresh interval — then `await expect(textarea).toHaveValue(typed)`. If the meta refresh ever creeps back in, the page navigates to itself and this assertion fails on an empty textarea.
+- Together (a) and (b) close the test gap — same lesson as the previous hotfix: our suite previously used `request.post(...)` to submit answers and never sat on the answer view long enough to experience the refresh.
+
+**Build / deploy / test results:**
+- `pnpm --filter product lint` clean.
+- `pnpm --filter product build` clean. Built bundle at `apps/product/dist/index.js` contains exactly **2** occurrences of `http-equiv="refresh"` (the two waiting views), down from 3.
+- `pnpm deploy:product` succeeded — version ID `fa5b9f6e-b94f-4d97-a866-9316213f1fd6`.
+- `PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --filter product test:e2e` — **all 9 Playwright tests pass against the deployed URL** (10.1s). The 7 prior tests (landing, host-alone, `POST /sessions`, real-browser-context partner click-through, `GET /s/<code>/join` 303, two-device join, full deck walkthrough) plus the 2 new tests (regression guard + browser-context textarea-survives-6s).
+
+**Manual evidence (per task spec step 5), against the deployed URL `fa5b9f6e-b94f-4d97-a866-9316213f1fd6`:**
+
+```
+$ curl -sS -X POST -c /tmp/host.txt -i .../sessions -o /tmp/raw.txt
+$ grep -i '^location:' /tmp/raw.txt
+location: /s/8HBXEY
+
+$ curl -sS -X POST -c /tmp/partner.txt -i .../s/8HBXEY/join -o /tmp/joinraw.txt -w '%{http_code}\n'
+303
+$ grep -i '^location:' /tmp/joinraw.txt
+location: /s/8HBXEY
+
+$ curl -sS -b /tmp/host.txt ".../s/8HBXEY" -o /tmp/answer.html -w '%{http_code}\n'
+200
+$ grep -c 'http-equiv="refresh"' /tmp/answer.html
+0
+$ grep -c 'Prompt 1 of 5' /tmp/answer.html
+1
+$ grep -c 'textarea name="text"' /tmp/answer.html
+1
+```
+
+The deployed answer view (host+partner both joined, prompt 1) returns HTTP 200, contains the textarea, contains the prompt-1 fragment, and contains **zero** `http-equiv="refresh"` tags. The fix is live.
+
+**Out of scope (per decision-log 2026-05-01 04:20):** No JS polling. No localStorage. No Durable Objects. No WebSockets. No JSON state endpoint. No share-URL change. No copy revision. No schema change. The other two refresh tags (lines 439 and 506) are intentionally untouched.
+
+**Reviewer:** please verify (1) `apps/product/src/index.ts` has exactly two `http-equiv="refresh"` occurrences (on `renderWaitingForJoiner` and `renderWaitingForRevealView`), (2) `renderAnswerView` no longer contains one, (3) all 9 Playwright tests pass against the deployed URL, (4) the deployed answer view's HTML contains no `http-equiv="refresh"` (any session where both have joined), and (5) typing in the textarea actually persists past 6 seconds in a real browser.

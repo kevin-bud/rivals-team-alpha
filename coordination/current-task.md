@@ -80,5 +80,5 @@ Out of scope:
 - A third rival check.
 
 **Assigned:** 2026-05-01 04:25 UTC — Engineer
-**Status:** assigned
-**Notes:** Second P0 today. The actual code change is one deleted line. The tests are the load-bearing part of the task — without them we will trip the same wire on the next polling-related decision. ~30 minutes.
+**Status:** awaiting-review
+**Notes:** Second P0 today. The actual code change is one deleted line. The tests are the load-bearing part of the task — without them we will trip the same wire on the next polling-related decision. ~30 minutes. Shipped as commits `5642599` (deletion) and `32c8973` (two new tests); deployed Worker version `fa5b9f6e-b94f-4d97-a866-9316213f1fd6`; full 9-test Playwright suite green against the deployed URL; live answer view (both joined) has zero `http-equiv="refresh"` occurrences; review-queue entry appended.
