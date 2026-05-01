@@ -822,6 +822,19 @@ const handle = async (
       return htmlResponse(renderJoinView(code));
     }
 
+    if (rest === "/join" && method === "GET") {
+      // The share URL we render to the host is `/s/<code>/join`, but the
+      // canonical join surface is `/s/<code>`. When a real user clicks
+      // (or pastes) the share link their browser issues a GET, which
+      // would otherwise fall through to the 404 page. Redirect to the
+      // canonical surface — no session lookup, no cookie work, just an
+      // alias.
+      return new Response(null, {
+        status: 303,
+        headers: { location: `/s/${code}` },
+      });
+    }
+
     if (rest === "/join" && method === "POST") {
       const { id, minted } = getOrMintParticipantId(request);
       const updated = await joinSession(env.SESSIONS, code, id);

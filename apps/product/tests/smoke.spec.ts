@@ -154,6 +154,106 @@ const fetchInside = async (
   return response.text();
 };
 
+test("partner clicks the share link in a real browser context and joins", async ({
+  browser,
+  baseURL,
+}) => {
+  // Host context: starts a session via the landing-page form so we
+  // exercise the same path a real host takes — not a raw POST.
+  const hostContext = await browser.newContext();
+  const hostPage = await hostContext.newPage();
+  await hostPage.goto("/");
+  await hostPage.getByRole("button", { name: "Start a session" }).click();
+
+  // Host should now be on the inside view, with the share URL rendered
+  // as a clickable anchor.
+  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  const shareLink = hostPage.locator("a.share-url");
+  await expect(shareLink).toBeVisible();
+  const shareUrl = await shareLink.getAttribute("href");
+  expect(shareUrl, "host page must render a share URL").not.toBeNull();
+  expect(shareUrl ?? "").toMatch(/\/s\/[A-Z0-9]{6}\/join$/);
+
+  const codeMatch = (shareUrl ?? "").match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  // Partner context: a fresh browser context (no cookies) — the second
+  // person clicking the link they were sent.
+  const partnerContext = await browser.newContext();
+  const partnerPage = await partnerContext.newPage();
+
+  // Partner navigates directly to the literal share URL the host was
+  // told to share. Before the fix this returned a 404 page; it must
+  // now resolve to the join view (after the 303 redirect to /s/<code>).
+  const partnerResponse = await partnerPage.goto(
+    shareUrl ?? `${baseURL ?? ""}/s/${code}/join`,
+  );
+  expect(partnerResponse, "partner page.goto should yield a response").not.toBeNull();
+  expect(partnerResponse?.status()).toBe(200);
+
+  // Title must not be the "session not found" page.
+  const partnerTitle = await partnerPage.title();
+  expect(partnerTitle.toLowerCase()).not.toContain("not found");
+  expect(partnerTitle).toMatch(/Roundtable/);
+
+  // The join view is on the page: a "Join this session" submit button
+  // inside a POST form pointing at /s/<code>/join.
+  const joinForm = partnerPage.locator(
+    `form[method="post"][action="/s/${code}/join"]`,
+  );
+  await expect(joinForm).toHaveCount(1);
+  await expect(
+    partnerPage.getByRole("button", { name: "Join this session" }),
+  ).toBeVisible();
+
+  // Partner clicks the submit. They should land on /s/<code> with the
+  // joined inside-view showing "2 of 2 here" (or the answer view if
+  // both are present and the deck has unlocked).
+  await partnerPage.getByRole("button", { name: "Join this session" }).click();
+  await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
+
+  const partnerBody = await partnerPage.content();
+  // Either "2 of 2 here" (waiting view briefly) or the prompt-1 answer
+  // view — both are valid landed-on states once the partner has joined.
+  // The decisive thing is that we are not on the join view nor the 404.
+  expect(partnerBody).not.toContain("Session not found");
+  const showsBoth = partnerBody.includes("2 of 2 here");
+  const showsPrompt = partnerBody.includes("Prompt 1 of 5");
+  expect(
+    showsBoth || showsPrompt,
+    'partner must see either "2 of 2 here" or the first prompt after joining',
+  ).toBe(true);
+
+  await hostContext.close();
+  await partnerContext.close();
+});
+
+test("GET /s/<code>/join returns 303 redirect to /s/<code>", async ({
+  baseURL,
+}) => {
+  // Pure routing assertion — the unit test for the hotfix. No browser
+  // needed; we just want to prove the redirect status and Location.
+  const ctx = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const create = await ctx.post("/sessions", { maxRedirects: 0 });
+  expect(create.status()).toBe(303);
+  const createLocation = create.headers()["location"] ?? "";
+  const codeMatch = createLocation.match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  const joinGet = await ctx.get(`/s/${code}/join`, { maxRedirects: 0 });
+  expect(joinGet.status()).toBe(303);
+  expect(joinGet.headers()["location"]).toBe(`/s/${code}`);
+
+  await ctx.dispose();
+});
+
 test("two participants walk the full five-prompt deck end-to-end", async ({
   baseURL,
 }) => {
