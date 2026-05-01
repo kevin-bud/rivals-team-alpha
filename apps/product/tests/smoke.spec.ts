@@ -362,3 +362,95 @@ test("two participants walk the full five-prompt deck end-to-end", async ({
   await host.dispose();
   await partner.dispose();
 });
+
+test("answer view HTML must not contain a meta refresh (regression guard)", async ({
+  baseURL,
+}) => {
+  // Static regression guard: the answer view (the view with the
+  // textarea) must never auto-refresh — that destroys the user's
+  // typing. This is the cheap, definitive check that fires even if
+  // Playwright timing changes; the browser-context test below proves
+  // the user-experience effect.
+  const host = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const partner = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+
+  const create = await host.post("/sessions", { maxRedirects: 5 });
+  expect(create.status()).toBe(200);
+  const codeMatch = (await create.text()).match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  // Partner joins so the deck is unlocked and the host's GET /s/<code>
+  // lands on the answer view rather than the waiting-for-joiner view.
+  const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(join.status()).toBe(200);
+
+  const answerHtml = await fetchInside(host, code);
+  // We are on the answer view for prompt 1.
+  expect(answerHtml).toContain("Prompt 1 of 5");
+  expect(answerHtml).toContain('prompt_id" value="values-enough"');
+  // regression guard: the answer view must not auto-refresh — it would clear the textarea
+  expect(answerHtml).not.toContain('http-equiv="refresh"');
+
+  await host.dispose();
+  await partner.dispose();
+});
+
+test("typed text in the answer-view textarea survives longer than the old refresh interval", async ({
+  browser,
+}) => {
+  // Real browser-context proof: type into the answer-view textarea,
+  // wait longer than the old 5-second meta refresh, and assert the
+  // text is still in the textarea. Same pattern as the share-link
+  // test added in the previous hotfix.
+  const hostContext = await browser.newContext();
+  const hostPage = await hostContext.newPage();
+  await hostPage.goto("/");
+  await hostPage.getByRole("button", { name: "Start a session" }).click();
+
+  // Host is on the waiting-for-joiner view; pull the share URL.
+  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  const shareLink = hostPage.locator("a.share-url");
+  const shareUrl = await shareLink.getAttribute("href");
+  expect(shareUrl, "host page must render a share URL").not.toBeNull();
+  const codeMatch = (shareUrl ?? "").match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  // Partner joins via the share URL — fresh context so no cookies.
+  const partnerContext = await browser.newContext();
+  const partnerPage = await partnerContext.newPage();
+  await partnerPage.goto(shareUrl ?? `/s/${code}/join`);
+  await partnerPage.getByRole("button", { name: "Join this session" }).click();
+  await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
+
+  // Host navigates to the inside view; with the partner present, this
+  // is the answer view for prompt 1.
+  await hostPage.goto(`/s/${code}`);
+  await expect(hostPage.getByText("Prompt 1 of 5")).toBeVisible();
+  const textarea = hostPage.locator('textarea[name="text"]');
+  await expect(textarea).toBeVisible();
+
+  const typed =
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+  await textarea.fill(typed);
+  await expect(textarea).toHaveValue(typed);
+
+  // Wait longer than the old 5-second refresh interval. If the
+  // <meta refresh> ever creeps back in, the page will navigate to
+  // itself and the textarea will be empty when the assertion fires.
+  await hostPage.waitForTimeout(6000);
+
+  await expect(textarea).toHaveValue(typed);
+
+  await hostContext.close();
+  await partnerContext.close();
+});
