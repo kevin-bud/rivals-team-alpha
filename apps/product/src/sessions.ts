@@ -10,6 +10,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24;
 const MAX_PARTICIPANTS = 4;
 const MAX_CODE_GENERATION_ATTEMPTS = 8;
 const MAX_ANSWER_LENGTH = 2000;
+const MAX_CLOSING_NOTE_LENGTH = 280;
 
 export type Participant = {
   id: string;
@@ -24,6 +25,9 @@ export type Session = {
   answers: Record<string, Record<string, string>>;
   completedAt: number | null;
   startedAt: number | null;
+  closingNote: string;
+  closingNoteUpdatedBy: string | null;
+  closingNoteUpdatedAt: number | null;
 };
 
 const sessionKey = (code: string): string => `session:${code}`;
@@ -66,6 +70,9 @@ const hydrateSession = (raw: string): Session => {
     answers: parsed.answers ?? {},
     completedAt: parsed.completedAt ?? null,
     startedAt: parsed.startedAt ?? null,
+    closingNote: parsed.closingNote ?? "",
+    closingNoteUpdatedBy: parsed.closingNoteUpdatedBy ?? null,
+    closingNoteUpdatedAt: parsed.closingNoteUpdatedAt ?? null,
   };
 };
 
@@ -91,6 +98,9 @@ export const createSession = async (
       answers: {},
       completedAt: null,
       startedAt: null,
+      closingNote: "",
+      closingNoteUpdatedBy: null,
+      closingNoteUpdatedAt: null,
     };
     await writeSession(kv, session);
     return session;
@@ -281,6 +291,58 @@ export const advanceSession = async (
     ...session,
     currentPromptIndex: nextIndex,
     completedAt,
+  };
+  await writeSession(kv, updated);
+  return updated;
+};
+
+// The shared closing note: a single sentence on the complete view that
+// any participant can write or revise. Last write wins. Empty input is
+// treated as a delete — different from "nobody has written yet" — so
+// the metadata fields are cleared too. See decision-log entry
+// 2026-05-01 06:50 ("Plural depth: a shared closing sentence on the
+// complete view") for the rationale.
+export const setClosingNote = async (
+  kv: KVNamespace,
+  code: string,
+  participantId: string,
+  text: string,
+): Promise<Session | null> => {
+  const session = await getSession(kv, code);
+  if (session === null) {
+    return null;
+  }
+  const isParticipant = session.participants.some(
+    (p) => p.id === participantId,
+  );
+  if (!isParticipant) {
+    return null;
+  }
+  // The closing note is a take-away from a finished conversation; the
+  // act of writing one presupposes the deck is over.
+  if (session.completedAt === null) {
+    return null;
+  }
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    const cleared: Session = {
+      ...session,
+      closingNote: "",
+      closingNoteUpdatedBy: null,
+      closingNoteUpdatedAt: null,
+    };
+    await writeSession(kv, cleared);
+    return cleared;
+  }
+  const capped =
+    trimmed.length > MAX_CLOSING_NOTE_LENGTH
+      ? trimmed.slice(0, MAX_CLOSING_NOTE_LENGTH)
+      : trimmed;
+  const updated: Session = {
+    ...session,
+    closingNote: capped,
+    closingNoteUpdatedBy: participantId,
+    closingNoteUpdatedAt: Date.now(),
   };
   await writeSession(kv, updated);
   return updated;
