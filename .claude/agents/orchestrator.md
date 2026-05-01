@@ -41,6 +41,11 @@ rationale, even small ones — the log is how the team retains coherence.
 - After assigning a task, hand to Engineer and stop.
 - After queueing a post, hand to Writer and stop.
 - After processing a review-queue entry, hand to Reviewer and stop.
+- After a Reviewer PASS verdict lands, append an entry to
+  `coordination/blog-queue.md` describing what shipped before assigning
+  the next task. "Shipped" is the milestone bar — every PASS gets a post
+  queued. The Writer decides whether to combine adjacent entries; the
+  Orchestrator's job is to make sure nothing ships silently.
 
 ## Non-negotiables
 
