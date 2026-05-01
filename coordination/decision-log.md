@@ -281,3 +281,29 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - Footer/disclaimer copy unchanged.
 
 **Reversible?** Mostly yes. Reverting would mean re-hardcoding the "of 2" copy, removing the host-begins CTA (or auto-starting at 2), and dropping `startedAt`. None of those would break sessions in flight if we kept the field nullable.
+
+---
+
+## 2026-05-01 06:15 — Regulated-advice copy audit, with a test that locks in the rules
+
+**Context:** The brief lists four evaluation axes: product bets, decision evolution, divergence from the rival, and *how we handled the regulated-advice line*. We have produced strong evidence on the first three (this log; the rival-state file; four published posts). On the fourth, our evidence is implicit — every prompt we wrote, every piece of UI copy, every disclaimer was held to the rule "neutral, value/feeling-oriented, no advice, no specific amounts, British English" (decision-log 2026-05-01 02:35). But we have never produced a single artefact that *demonstrates* the discipline as a deliberate practice rather than as a pattern someone might infer from the code. Doing that now closes the gap.
+
+**Options considered:**
+- **(a) A documented copy audit + an automated test.** Read every user-facing string in `apps/product/src/index.ts`, classify each against a small set of rules, and write the audit notes to a checked-in document. Add a Playwright test that fetches every reachable view and asserts none of them contain a banned-term regex (e.g. specific currency symbols followed by digits, named financial products, the words "should", "recommend", "advise", "tax", "investment" — except inside the disclaimer copy itself). This is the highest-evidence option.
+- **(b) Just write a blog post about the discipline.** Cheap, but the post is unfalsifiable — words on a page with no enforcement. The brief is unlikely to find that as compelling as a checked-in test.
+- **(c) Defer to a future task.** Risk: future copy changes might drift across the line without a guard.
+- **(d) An LLM-based audit at runtime.** Reactive scope creep. Adds API surface and dependencies for a problem that does not require ML to solve.
+
+**Choice:** Option (a). Concretely:
+1. **Audit document.** A new file `apps/product/COPY-AUDIT.md` listing the rules verbatim (taken from decision-log 02:35), then a table of every user-facing string in `apps/product/src/index.ts` and `apps/product/src/prompts.ts`, classified by which rule(s) it must obey, and the verdict (`compliant` / `compliant by exception (disclaimer)` / `flagged`). The Engineer will write this — they have the source in hand. We expect zero `flagged` entries; if any appear, the Engineer stops and reports.
+2. **Banned-term regression test.** A new Playwright test that walks every reachable view (landing, lobby, answer view, waiting-for-reveal, reveal, complete, "session full", "session not found", `/s/<code>/join` redirect target) and asserts the rendered HTML does not contain any of these case-insensitive patterns *outside the disclaimer block*: `\b(invest(ed|ing|ment)?|tax(es|ation)?|legal|recommend(s|ed|ing)?|advise[ds]?|adviser|advisor|should|ought to)\b`, `[£$€¥]\s*\d`, `\d+%`. The disclaimer block itself is exempt (it must contain "tax", "legal", "investment", "advice"). The test must pass against the deployed URL. Use a small allow-list inside the disclaimer area implemented as: "look for the matches; for each match, check the closest enclosing element has a `data-disclaimer` attribute or sits inside a `<footer>` — if so, skip; else fail".
+3. **Add a `data-disclaimer` attribute** to the existing disclaimer container(s) so the test has an unambiguous boundary.
+4. **One short blog post** after PASS, walking a reader through the rules, the audit, and the test. This gives the brief's evaluators an explicit answer to their fourth question.
+
+**Rationale:**
+- Closes the only weakly-evidenced axis on the brief's evaluation rubric.
+- Pure additive change to production code (one HTML attribute), plus a test, plus a doc. Negligible regression risk.
+- The test is the load-bearing artefact: a future feature that drifts across the line will fail the build, not just look bad in a code review.
+- Discipline-as-code generalises: any future Engineer working on this repo gets the rule enforced for them, regardless of what guidance they read.
+
+**Reversible?** Trivially. Removing the test, the audit doc, and the `data-disclaimer` attribute is one commit. We will not want to remove them — the test pays for itself the first time a copy change unintentionally crosses the line.
