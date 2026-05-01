@@ -426,3 +426,21 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 **Rationale:** Tightens the submission's evidence-quality at near-zero cost. The Writer is the right role per CLAUDE.md's hard-rule split (`apps/blog/` is the Writer's territory). The Orchestrator can't edit application directories.
 
 **Reversible?** Yes — `welcome.md` is in git history if we ever want it back.
+
+---
+
+## 2026-05-01 09:40 — User-directed tail polish on the blog after stop
+
+**Context:** After the 07:55 "submission stands as-is" entry and the 08:00 hygiene addendum, the user instructed three further edits to the blog and team-config trail. Recording them here so the decision log does not silently disagree with what is now deployed and committed. None of these changes alter the brief-evaluation story; all are submission-quality polish.
+
+1. **Per-post commit-time `pubDate` on the seven kept posts (commit `bd1165b`).** Frontmatter changed from a date-only `pubDate: "2026-05-01"` to ISO datetimes carrying the timezone of each post's initial commit (e.g. `2026-05-01T03:20:02+01:00`). The visible date on the index and post pages is unchanged — both renderers slice to `YYYY-MM-DD` — but the underlying `<time datetime="…">` attribute, the index's reverse-chronological sort, and RSS `pubDate` now reflect actual publication order down to the minute. Schema is `z.coerce.date()`, which accepts ISO 8601; local Astro build passes; deployed `/posts/<slug>/` pages now expose minute-level datetimes (e.g. `2026-05-01T01:59:18.000Z` for the first post, `2026-05-01T04:24:20.000Z` for the retrospective), and the index orders them retrospective → one-last-thing → advice-line → seats-2-to-4 → take-away → MVP → roundtable, which matches the commit timeline. Worker version `bee652d8-38ae-47c2-affd-ee0eba44f3de`.
+
+2. **Test-debt paydown section appended to `take-away-and-two-bugs.md` (commit `e923aa8`).** Adds a third section, *Then we paid the test debt down*, which records the structural follow-up to the two P0s: six new browser-context tests, suite from nine to fifteen, the deliberate no-production-code scope of that commit, and the framing that "finding no bug is itself a result worth recording". Closes the post on the lesson rather than on the bugs. The post's title and prior body are unchanged. Worker version `4e37cbef-7140-44d0-ab8b-f60ad1adf508` after the redeploy carries the new section at `/posts/take-away-and-two-bugs/`.
+
+3. **Orchestrator role update: rival check on every PASS milestone (commit `208edb8`).** `.claude/agents/orchestrator.md` now instructs the Orchestrator to run `/check-rival` immediately after each Reviewer PASS verdict, alongside the existing blog-queue entry. Codifies the convention that milestones are the right moment to refresh the rival view regardless of when the last poll ran. Internal to the team's operating manual; no public-facing surface affected.
+
+**Why these were not in the original trail:** The 07:55 stop was the right call at the time and remains so for the day's product scope. The user surfaced these three items afterwards as straightforward submission polish: a metadata correction (1), one missing process beat in an existing post (2), and a team-config tweak (3). None re-opens a product decision; none introduces new product scope; none changes any decision already logged.
+
+**Submission still stands.** The deployed product is unchanged. The published blog is the same eight posts (seven kept, one removed at 08:00), with one of those seven now ending on its true closing beat and all seven carrying minute-precision publication metadata. The decision log, rival-state, review-queue, copy-audit, and test suite are unchanged in substance.
+
+**Reversible?** Yes — each commit can be reverted independently. The pubDate change is metadata-only and would revert by a one-line edit. The take-away section is a self-contained markdown block. The orchestrator.md update is a guidance addition, not a behaviour change to anything already shipped.

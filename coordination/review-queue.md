@@ -559,3 +559,67 @@ two-or-more-roundtable-seats-2-to-4 -> 200
 Result: 7 × 200 (kept posts) + 1 × 200 (index, no longer listing "Project under way") + 1 × 404 (`/posts/welcome/`). All eight expected status codes match the spec.
 
 **Reviewer verdict:** PENDING
+
+---
+
+## 2026-05-01 — User-directed tail polish: ISO pubDates + take-away section appended
+
+**Commits:** bd1165b (pubDates), e923aa8 (take-away section), 208edb8 (orchestrator role)
+**Deployed URL:** https://rivals-team-alpha-blog.kevin-wilson.workers.dev
+**Worker version (current, after second deploy):** 4e37cbef-7140-44d0-ab8b-f60ad1adf508
+**Claim:** Per decision-log 2026-05-01 09:40 ("User-directed tail polish on the blog after stop"). Three commits made under direct user instruction after the 07:55 stop:
+
+1. Frontmatter `pubDate` on the seven kept posts changed from date-only `"2026-05-01"` to ISO datetimes carrying the original commit's timezone (e.g. `2026-05-01T03:20:02+01:00`). Visible date on rendered pages unchanged (renderer slices to YYYY-MM-DD); the `<time datetime="…">` attribute, index sort order, and RSS `pubDate` now reflect publication time down to the minute.
+2. Third section *Then we paid the test debt down* appended to `take-away-and-two-bugs.md` — records the post-P0 structural follow-up (six browser-context tests, suite nine → fifteen, no production code touched).
+3. `.claude/agents/orchestrator.md` updated so the Orchestrator runs `/check-rival` after every PASS milestone alongside the blog-queue append. Internal team-config; no public surface change.
+
+Blog redeployed twice via `pnpm deploy:blog` (turbo runs the Astro build first per project memory). First deploy (Worker `bee652d8-38ae-47c2-affd-ee0eba44f3de`) carried (1); second deploy (Worker `4e37cbef-7140-44d0-ab8b-f60ad1adf508`) carried (2) on top. Welcome.md remains absent (still 404).
+
+**Definition-of-done evidence (curl against the deployed URL after the second deploy):**
+
+```
+$ curl -sS -o /dev/null -w '%{http_code}\n' https://rivals-team-alpha-blog.kevin-wilson.workers.dev/
+200
+$ curl -sS -o /dev/null -w '%{http_code}\n' https://rivals-team-alpha-blog.kevin-wilson.workers.dev/posts/welcome/
+404
+$ for slug in mvp-shipped-the-deck-of-five one-last-thing-together \
+              retrospective-what-we-built-and-what-we-didnt \
+              roundtable-and-the-join-handshake take-away-and-two-bugs \
+              the-advice-line-audited-and-locked-in \
+              two-or-more-roundtable-seats-2-to-4; do
+    printf "%s -> " "$slug"
+    curl -sS -o /dev/null -w '%{http_code}\n' \
+      "https://rivals-team-alpha-blog.kevin-wilson.workers.dev/posts/$slug/"
+  done
+mvp-shipped-the-deck-of-five -> 200
+one-last-thing-together -> 200
+retrospective-what-we-built-and-what-we-didnt -> 200
+roundtable-and-the-join-handshake -> 200
+take-away-and-two-bugs -> 200
+the-advice-line-audited-and-locked-in -> 200
+two-or-more-roundtable-seats-2-to-4 -> 200
+
+$ curl -sS https://rivals-team-alpha-blog.kevin-wilson.workers.dev/posts/take-away-and-two-bugs/ | grep -c "Then we paid the test debt down"
+1
+
+$ for slug in mvp-shipped-the-deck-of-five one-last-thing-together \
+              retrospective-what-we-built-and-what-we-didnt \
+              roundtable-and-the-join-handshake take-away-and-two-bugs \
+              the-advice-line-audited-and-locked-in \
+              two-or-more-roundtable-seats-2-to-4; do
+    printf "%s -> " "$slug"
+    curl -sS "https://rivals-team-alpha-blog.kevin-wilson.workers.dev/posts/$slug/" \
+      | grep -oE '<time datetime="[^"]+"' | head -1
+  done
+mvp-shipped-the-deck-of-five -> <time datetime="2026-05-01T02:20:02.000Z"
+one-last-thing-together -> <time datetime="2026-05-01T04:13:18.000Z"
+retrospective-what-we-built-and-what-we-didnt -> <time datetime="2026-05-01T04:24:20.000Z"
+roundtable-and-the-join-handshake -> <time datetime="2026-05-01T01:59:18.000Z"
+take-away-and-two-bugs -> <time datetime="2026-05-01T02:59:27.000Z"
+the-advice-line-audited-and-locked-in -> <time datetime="2026-05-01T03:53:20.000Z"
+two-or-more-roundtable-seats-2-to-4 -> <time datetime="2026-05-01T03:35:25.000Z"
+```
+
+Index order (most recent first) on the deployed homepage matches the commit timeline: retrospective → one-last-thing → advice-line → seats-2-to-4 → take-away → MVP → roundtable.
+
+**Reviewer verdict:** PENDING — same precedent as the 08:00 hygiene entry: this is docs/metadata polish on the blog, not a product change. Orchestrator's curl evidence above is the verification record.
