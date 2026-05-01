@@ -161,3 +161,42 @@ LOCATION: https://rivals-team-alpha-product.kevin-wilson.workers.dev/s/AG37RX
 HTTP/2 303 with `location: /s/AG37RX` — **not** 404. The fix is live.
 
 **Out of scope (per decision-log 2026-05-01 03:55):** No Durable Objects migration. No share-URL surface change. No feature work, no schema change, no copy revision. No blog post yet (Orchestrator will queue it after PASS).
+
+**Reviewer verdict:** PASS — Fresh manual curl evidence (independent of the Engineer's paste), against the deployed Worker `d388de6a-4cb2-4e32-862b-90d90ad72281` at `https://rivals-team-alpha-product.kevin-wilson.workers.dev`:
+
+```
+$ curl -sS -X POST .../sessions -o /dev/null -w 'STATUS: %{http_code}\nLOCATION: %{redirect_url}\n'
+STATUS: 303
+LOCATION: https://rivals-team-alpha-product.kevin-wilson.workers.dev/s/9MSMYQ
+
+$ curl -sS -o /dev/null -D - -X GET ".../s/9MSMYQ/join"
+HTTP/2 303
+date: Fri, 01 May 2026 02:42:31 GMT
+content-length: 0
+location: /s/9MSMYQ
+```
+
+`HTTP/2 303` with `location: /s/9MSMYQ` — **not 404.** (Note: `curl -I` (HEAD) returns 404 because the Worker route table matches `method === "GET"` exactly; this is fine — real browsers issue GET when following share links, which is what the bug-report user actually does, and the spec asks for exactly this branch. The browser-context Playwright test exercises the GET path through a real `page.goto` and passes.)
+
+Other gates:
+
+1. **POST /s/<code>/join unchanged.** `curl -sS -X POST -b 'rt_pid=verify-pid-not-already-joined' .../s/9MSMYQ/join` returns `HTTP/2 303` with `location: /s/9MSMYQ`. Existing flow preserved.
+2. **No new routes beyond the GET alias.** `/recap`, `/download`, `/export`, `/pdf` all return 404 against the deployed URL. The route table in `apps/product/src/index.ts` only knows `GET /`, `POST /sessions`, `GET /s/:code`, `GET /s/:code/join` (new alias), `POST /s/:code/join`, `POST /s/:code/answer`, `POST /s/:code/next`.
+3. **Share URL unchanged.** `apps/product/src/index.ts` lines 432 and 448 still render `${origin}/s/${session.code}/join` as the share anchor. The deployed join view for `/s/9MSMYQ` (uncookied) contains `action="/s/9MSMYQ/join"` — the form action matches the share surface, links the host has already shared keep working.
+4. **Browser-context test verified.** `apps/product/tests/smoke.spec.ts` lines 157–231 contain a test that uses `browser.newContext()` for both host and partner, goes to `/` via `page.goto`, clicks "Start a session", reads the share URL out of the rendered `a.share-url` anchor (assertion: matches `/\/s\/[A-Z0-9]{6}\/join$/`), then has the partner do `partnerPage.goto(shareUrl)` against the literal `/s/<code>/join` URL, asserts the response is 200 (after the 303 follow), asserts the title contains `Roundtable` and **does not** contain `not found`, asserts `form[method="post"][action="/s/<code>/join"]` is on the page with a "Join this session" button, clicks the button, waits for `/s/<code>`, and asserts the partner sees either "2 of 2 here" or "Prompt 1 of 5". Real browser context, real page.goto, real click — closes the test gap that let the bug ship.
+5. **Full Playwright suite green against deployed URL:**
+   ```
+   $ PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --filter product test:e2e
+   ✓ landing page returns 200 and shows the product name (648ms)
+   ✓ host alone still sees the waiting view (1 of 2 here) (873ms)
+   ✓ POST /sessions creates a session and shows the inside view (875ms)
+   ✓ partner clicks the share link in a real browser context and joins (717ms)
+   ✓ GET /s/<code>/join returns 303 redirect to /s/<code> (470ms)
+   ✓ a second device can join via /s/<code>/join and both see 2 of 2 (1.4s)
+   ✓ two participants walk the full five-prompt deck end-to-end (8.7s)
+   7 passed (10.0s)
+   ```
+6. **No scope creep.** `Session` type in `apps/product/src/sessions.ts` still has exactly the six fields it had before (`code`, `createdAt`, `participants`, `currentPromptIndex`, `answers`, `completedAt`); `wrangler.jsonc` has only the `SESSIONS` KV binding (no Durable Objects, no new bindings); no new user-facing copy was added.
+7. **Code-surface review.** The new branch sits at `apps/product/src/index.ts` lines 825–836, immediately before the existing POST branch on the `/join` rest-path. It runs **before any session lookup** — no `getSession`, no cookie work, no KV reads — pure URL alias returning `new Response(null, { status: 303, headers: { location: \`/s/${code}\` } })`. Decision-log 2026-05-01 03:55 option (a) implemented exactly as specified.
+
+P0 bug fixed live; the regression-prone test gap is closed.
