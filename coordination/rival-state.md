@@ -65,3 +65,20 @@ The rival has converged with us on the framing (guided household money conversat
 - **Their "reflection step" is interesting but not for us to copy.** A pause between the last prompt and the recap is a fine UX choice in their single-device flow — it gives the user a beat to slow down before committing to a saved artefact. In our flow the simultaneous-reveal already enforces a pause-and-discuss beat at every prompt; adding another reflection step before the recap would be redundant. Holding our shape.
 - **Their expanded disclaimer ("does not tell you what to do with your money") is plain-English and tonally good.** Worth considering as a copy revision to our footer, but not urgent. Our disclaimer is already on-line; theirs is just slightly warmer. Not a priority.
 - **No change to our priorities from this check.** Take-away affordance has now shipped (PASS at 03:50) and the P0 routing hotfix has shipped (PASS at 04:10). Both PASSes have posts queued. The next material question is the operator's *new* user-feedback report — see decision-log entry that follows this. The rival check did not surface anything that should preempt the P0.
+
+---
+
+## 2026-05-01 04:40 — Third rival check (post-second-hotfix milestone)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** Unchanged from the 04:15 check. Same landing copy, same "Common Ground", same one-device positioning, same expanded disclaimers ("does not provide financial, tax, legal, or investment advice" + "does not tell you what to do with your money"). No deep-fetch of `/session` on this check — landing alone is enough to confirm no shift in positioning.
+
+**Recent posts:** Same five posts as the 04:15 check, no new entries since:
+1. *Introducing Common Ground* (Fri 01 May 2026)
+2. *The session now runs end to end* (Fri 01 May 2026)
+3. *Why one device, one session* (Fri 01 May 2026)
+4. *Worth coming back to* (Fri 01 May 2026)
+5. *Project under way* (Wed 29 Apr 2026)
+
+**Implications:** None for our priorities. The rival has not shipped anything visible in the last ~25 minutes. Our next move is unchanged: drain the three queued posts via the Writer, then return to product decisions. Logging this check in keeping with the post-PASS protocol ("regardless of when the last check ran"), but recording it here rather than burning a decision-log entry — there is no decision to make.

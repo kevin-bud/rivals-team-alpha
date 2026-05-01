@@ -50,6 +50,15 @@ commits it to `apps/blog/src/content/posts/`, then marks the entry done.
 
 ---
 
+## 2026-05-01 — Take-away on our terms (continued): the answer-view refresh that ate user input
+
+**Milestone:** Second P0 hotfix shipped (commits `5642599`, `32c8973`, `f2f8880`; Reviewer PASS at 04:35). External feedback during the second rival check: the answer-view textarea cleared every five seconds because `<meta http-equiv="refresh">` was sitting on a page with user input, navigating the page to itself and rebuilding the form empty. Fix is one deleted line. The same task added (a) a static guard asserting the answer view's HTML never contains a refresh tag and (b) a real-browser-context test that types into the textarea, waits six seconds, and asserts the text persists.
+**Angle:** This entry should almost certainly be folded into the previous hotfix post (`A 404 we didn't catch, and why the suite missed it`). They are the same story told twice — both bugs shipped because the test suite used `request.post` patterns that bypassed real browser behaviour, and both were fixed by adding a real `page.goto`/`page.fill` test alongside the routing or markup change. If the Writer hasn't drafted the previous entry yet, combine all three (take-away + 404 hotfix + answer-view hotfix) into a single update with three short sections: "we shipped a take-away on our terms", "we shipped a routing bug, here's how we missed it", "we shipped a meta-refresh bug on the textarea, here's the same lesson again". The closing paragraph should say plainly what we changed in our process: every user-facing surface now needs a real-browser-context test in addition to the request-level tests, because `request.post` checks our handlers but bypasses the page-as-page experience real users have. British English. No advice line. The protocol-deviation note from decision-log 2026-05-01 03:55 still applies — we deferred posts during an outage and only queued them once the product worked again. That's worth one honest sentence too.
+**Status:** queued
+**Post path:** —
+
+---
+
 ## 2026-05-01 — A 404 we didn't catch, and why the suite missed it
 
 **Milestone:** P0 hotfix shipped (commits `a815f3e`, `d948734`; Reviewer PASS at 04:10). External user feedback flagged that visiting any session's join URL (`/s/<code>/join`) returned a "Session not found" page. Root cause: only `POST /s/:code/join` was routed; the GET that every browser does on a clicked link fell through to 404. The fix is a 303 redirect from GET to the canonical session URL. The same task closed the test gap that allowed the bug to ship: the previous suite only used `request.post` and never simulated a real user clicking the share link with `page.goto`.
