@@ -2,11 +2,14 @@
 // later without rewriting the routes — see decision-log entry
 // 2026-05-01 02:05 ("Persistence: Cloudflare KV for sessions").
 
+import { prompts } from "./prompts";
+
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
 const MAX_PARTICIPANTS = 4;
 const MAX_CODE_GENERATION_ATTEMPTS = 8;
+const MAX_ANSWER_LENGTH = 2000;
 
 export type Participant = {
   id: string;
@@ -17,6 +20,9 @@ export type Session = {
   code: string;
   createdAt: number;
   participants: Array<Participant>;
+  currentPromptIndex: number;
+  answers: Record<string, Record<string, string>>;
+  completedAt: number | null;
 };
 
 const sessionKey = (code: string): string => `session:${code}`;
@@ -41,6 +47,26 @@ const writeSession = async (
   });
 };
 
+// Older session blobs may pre-date the deck-of-prompts schema (they were
+// written before the answers/index/completed fields existed). Coerce any
+// missing fields to safe defaults rather than crashing — TTL means
+// older blobs disappear within 24 hours anyway.
+const hydrateSession = (raw: string): Session => {
+  const parsed = JSON.parse(raw) as Partial<Session> & {
+    code: string;
+    createdAt: number;
+    participants: Array<Participant>;
+  };
+  return {
+    code: parsed.code,
+    createdAt: parsed.createdAt,
+    participants: parsed.participants,
+    currentPromptIndex: parsed.currentPromptIndex ?? 0,
+    answers: parsed.answers ?? {},
+    completedAt: parsed.completedAt ?? null,
+  };
+};
+
 export const createSession = async (
   kv: KVNamespace,
   hostParticipantId: string,
@@ -59,6 +85,9 @@ export const createSession = async (
       code,
       createdAt: now,
       participants: [{ id: hostParticipantId, joinedAt: now }],
+      currentPromptIndex: 0,
+      answers: {},
+      completedAt: null,
     };
     await writeSession(kv, session);
     return session;
@@ -74,7 +103,7 @@ export const getSession = async (
   if (raw === null) {
     return null;
   }
-  return JSON.parse(raw) as Session;
+  return hydrateSession(raw);
 };
 
 export const joinSession = async (
@@ -101,6 +130,117 @@ export const joinSession = async (
       ...session.participants,
       { id: participantId, joinedAt: Date.now() },
     ],
+  };
+  await writeSession(kv, updated);
+  return updated;
+};
+
+// True iff every currently-joined participant has an answer recorded for
+// the given prompt id. The reveal lock keys off this: once it flips
+// true, submitAnswer refuses further writes until advanceSession bumps
+// the index.
+const allParticipantsAnswered = (
+  session: Session,
+  promptId: string,
+): boolean => {
+  const answersForPrompt = session.answers[promptId];
+  if (answersForPrompt === undefined) {
+    return false;
+  }
+  return session.participants.every(
+    (p) => typeof answersForPrompt[p.id] === "string",
+  );
+};
+
+export const submitAnswer = async (
+  kv: KVNamespace,
+  code: string,
+  participantId: string,
+  promptId: string,
+  text: string,
+): Promise<Session | null> => {
+  const session = await getSession(kv, code);
+  if (session === null) {
+    return null;
+  }
+  if (session.completedAt !== null) {
+    return null;
+  }
+  const isParticipant = session.participants.some(
+    (p) => p.id === participantId,
+  );
+  if (!isParticipant) {
+    return null;
+  }
+  const currentPrompt = prompts[session.currentPromptIndex];
+  if (currentPrompt === undefined) {
+    return null;
+  }
+  if (currentPrompt.id !== promptId) {
+    return null;
+  }
+  // Reveal lock: once everyone has submitted, no further writes for
+  // this prompt — answers are frozen until someone advances.
+  if (allParticipantsAnswered(session, promptId)) {
+    return null;
+  }
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const capped =
+    trimmed.length > MAX_ANSWER_LENGTH
+      ? trimmed.slice(0, MAX_ANSWER_LENGTH)
+      : trimmed;
+  const existingForPrompt = session.answers[promptId] ?? {};
+  const updated: Session = {
+    ...session,
+    answers: {
+      ...session.answers,
+      [promptId]: {
+        ...existingForPrompt,
+        [participantId]: capped,
+      },
+    },
+  };
+  await writeSession(kv, updated);
+  return updated;
+};
+
+export const advanceSession = async (
+  kv: KVNamespace,
+  code: string,
+  participantId: string,
+): Promise<Session | null> => {
+  const session = await getSession(kv, code);
+  if (session === null) {
+    return null;
+  }
+  if (session.completedAt !== null) {
+    return null;
+  }
+  const isParticipant = session.participants.some(
+    (p) => p.id === participantId,
+  );
+  if (!isParticipant) {
+    return null;
+  }
+  const currentPrompt = prompts[session.currentPromptIndex];
+  if (currentPrompt === undefined) {
+    return null;
+  }
+  // Reveal lock the other way round: nobody advances until everyone
+  // currently in the session has answered. This is also what stops a
+  // participant from racing past the reveal.
+  if (!allParticipantsAnswered(session, currentPrompt.id)) {
+    return null;
+  }
+  const nextIndex = session.currentPromptIndex + 1;
+  const completedAt = nextIndex >= prompts.length ? Date.now() : null;
+  const updated: Session = {
+    ...session,
+    currentPromptIndex: nextIndex,
+    completedAt,
   };
   await writeSession(kv, updated);
   return updated;
