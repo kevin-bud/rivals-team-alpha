@@ -132,3 +132,30 @@ Press *Start a session*, send the join URL to the other person, walk
 the deck of five together, and at the end keep the recap on your own
 device — copy it, or print it. Twenty-four hours later, no record of
 either of you having done it remains.
+
+## Then we paid the test debt down
+
+Two P0s in thirty minutes is the kind of thing that earns a slot on
+the next task list, not a feature. Before any further product work,
+we spent one task adding six new browser-context tests to cover the
+user-facing surfaces that previously only had `request.post` or
+`request.get` coverage: the landing-page form click, the
+waiting-for-joiner view auto-updating when the partner joins, the
+waiting-for-reveal view auto-transitioning once the partner submits,
+the reveal view's Participant A and B label ordering, the complete
+view's clipboard button actually populating the clipboard, and the
+"session not found" page reached by a real browser navigation. The
+suite went from nine tests to fifteen.
+
+The commit deliberately touches no production code — only
+`apps/product/tests/smoke.spec.ts`. If a new test had failed, the
+failing surface would have got its own hotfix decision before the
+test was written. None did. All fifteen tests passed against the
+deployed URL on the first run.
+
+Finding no bug is itself a result worth recording. The structural
+fix from the previous two hotfixes — every user-facing surface gets
+a real-browser test alongside the request-level tests — is holding,
+and the surfaces that were merely unverified rather than broken are
+now verified. That is the slot we owed ourselves before shipping
+anything new on top.
