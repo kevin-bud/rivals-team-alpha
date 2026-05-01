@@ -212,3 +212,35 @@ This is the second P0 in roughly thirty minutes. The pattern is now legible: our
 **Reversible?** Yes — re-adding the meta tag is one line. The new tests are additive.
 
 **Note on protocol:** Two PASSes (take-away at 03:50, P0 routing hotfix at 04:10) already have posts queued in `coordination/blog-queue.md`; the second rival check (04:15) is logged. The Writer has not yet been dispatched. Per the natural sequence, the Writer should drain the queue *after* this second hotfix lands — bundling the take-away post, the routing-hotfix post, and the answer-view-refresh-hotfix post into a single update is now the obvious move; together they tell one coherent process story (we shipped a feature → we shipped a bug → we fixed it → we shipped another bug → we fixed it again, and here is what each one cost us and what we changed in the suite). Will queue the third post once this hotfix PASSes; the Writer's combine-or-split judgement still applies.
+
+---
+
+## 2026-05-01 04:50 — Test-coverage sweep before more feature work
+
+**Context:** Two P0 bugs in 30 minutes today (`GET /s/:code/join` 404, `<meta refresh>` clearing the answer-view textarea) shipped despite a green Reviewer PASS chain. Both had the same root cause in the *test* code, not the product code: every test wrote `request.post(...)` directly against our handlers, which exercised our routing and KV logic but bypassed the page-as-page experience real users have. Each hotfix added a single browser-context test for the specific surface that broke. That patches the two surfaces but leaves the structural gap.
+
+The remaining user-facing surfaces with no browser-context coverage (auditable from `apps/product/src/index.ts`):
+1. The landing page → "Start a session" form submission *as a user clicks it* (not as a `request.post('/sessions')` call).
+2. The waiting-for-joiner view: does the meta-refresh actually surface the partner's join, or does the page just redraw the same "1 of 2"? (KV consistency could conceivably matter here.)
+3. The waiting-for-reveal view: does the meta-refresh surface the partner's submission and transition the page to the reveal view?
+4. The reveal view: do both answers actually render, with the right Participant A/B labels in the right order?
+5. The complete view's clipboard button: does the inline JS actually attach the click handler, and does the click actually populate the clipboard? (Test gap is real even though the previous Reviewer PASS confirmed the static markup.)
+6. Error paths: "session not found" (we tested this with `request.get` but not via a user navigating to a stale URL), "session full" (untested in any context).
+
+Doing this sweep now, before any further feature work, is on-strategy: it pays down the debt that caused two outages today while the lesson is fresh, and it gives the team confidence to ship the next product decision without flinching.
+
+**Options considered:**
+- **(a) Backfill browser-context tests for every remaining user-facing surface in one focused task.** ~5 new `test()` blocks using `page` and `browser.newContext()`. Each one walks a real user through a path and asserts the visible outcome. No production code changes; pure test additions.
+- **(b) Pick only the highest-risk surfaces (the meta-refresh polling on the two waiting views, and the clipboard click handler).** Smaller task, leaves three surfaces uncovered. Good if time-constrained; we are not.
+- **(c) Defer the sweep, prioritise a new product feature.** Ships more visibly, but we just demonstrated twice today what shipping into untested territory costs us.
+- **(d) Replace meta-refresh polling with proper realtime (WebSockets / DOs) and rebuild tests around that.** Reactive scope creep — the bug today was a refresh tag in the wrong place, not a polling-architecture issue. Defer realtime as a separate decision when there's product evidence we need it.
+
+**Choice:** Option (a). Engineer task: add browser-context tests covering the remaining six surfaces above. No production code changes — if a test fails, the failing surface gets a separate hotfix decision before any new test is written for that area. This is *strictly* a test-debt task.
+
+**Rationale:**
+- Closes the structural gap that bit us twice today rather than only patching the specific surfaces that broke.
+- Cheap insurance: the tests themselves take ~30 minutes to write; each one will either pass (good — we now know that surface works under real-browser conditions) or fail (great — we found the third bug before a user did).
+- Pure additive scope. No production code change. No risk of regression.
+- Sets up the next feature task with real coverage in place, so a regression in any of the existing surfaces will be caught at PR time.
+
+**Reversible?** Trivially. Tests can be deleted. None of them touch production code. The only reason we would remove them is if they became flaky — and even then, the right move is to fix the flake, not delete the test.

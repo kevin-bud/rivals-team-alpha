@@ -3,82 +3,56 @@
 Set by the Orchestrator. Read by the Engineer. The Engineer updates the
 `Status` field as work progresses.
 
-**Task: P0 HOTFIX (second of the day).** External feedback: "App impossible to use. When a session starts and the user is presented with the text box, any text types in it clears every few seconds. Looking at the network tab, it's possible that there's a whole-page refresh."
-
-That is exactly what is happening. `apps/product/src/index.ts` line 472 — inside `renderAnswerView`, the view with the `<textarea>` — has `<meta http-equiv="refresh" content="5" />`. The browser navigates to itself every five seconds, the form is rebuilt empty, and the user's typing is destroyed.
+**Task:** Pure test-coverage sweep. Add real-browser-context Playwright tests covering the user-facing surfaces that have not yet been exercised through a real `page`/`browser.newContext()` walk. **No production code changes** in this task — if a test fails, you stop, set Status to `blocked`, and report the failure with evidence. The Orchestrator will decide on a follow-up hotfix; you will not patch in-line.
 
 Read first:
-- `coordination/decision-log.md` entry **2026-05-01 04:20 ("Second P0")** — binding spec, including why we chose option (a) over the JS-polling and localStorage alternatives.
-- `apps/product/src/index.ts` lines 461–492 (`renderAnswerView`) — the only place to change. Specifically remove line 472.
-- `apps/product/src/index.ts` lines 428–459 (`renderWaitingForJoiner`) and 494–523 (`renderWaitingForRevealView`) — leave the meta refresh on these. They have no input; their polling is correct.
+- `coordination/decision-log.md` entry **2026-05-01 04:50 ("Test-coverage sweep")** — binding spec. The "Choice" and "Rationale" sections are the contract.
+- `apps/product/src/index.ts` — for an authoritative list of user-facing render functions and their HTML structure.
+- `apps/product/tests/smoke.spec.ts` — extend, do not refactor.
 
-What to do:
+What to add (six tests; one focused per surface, in this order):
 
-1. **Remove the meta refresh from the answer view.** Delete exactly line 472:
-   ```
-   <meta http-equiv="refresh" content="5" />
-   ```
-   Do **not** remove it from the other two views. Do **not** introduce JS-based polling, localStorage persistence, Durable Objects, WebSockets, or a JSON state endpoint. Decision-log 2026-05-01 04:20 explicitly rejects all of those for this hotfix.
+1. **Landing → form submission as a user.** Use `page.goto('/')`, click the "Start a session" `<button type="submit">` inside the form. Follow the redirect via Playwright's default behaviour. Assert `page.url()` matches `/s/[2-9A-HJ-KMNP-Z]{6}` (six-char unambiguous alphabet). Assert the page contains a 6-character code in a visible element and "1 of 2 here" copy. This is distinct from the existing `request.post('/sessions')` test because it exercises form-action wiring, redirect cookie handling under a real user agent, and the rendered host view.
 
-2. **Add two tests** in `apps/product/tests/smoke.spec.ts`:
+2. **Waiting-for-joiner view auto-updates when the partner joins.** Open two `browser.newContext()` instances. Host: start a session via the form, land on the waiting view. Confirm the host's page shows "1 of 2 here". Then in the partner context: navigate to the share URL, click "Join this session". Back in the host's `page`: do **not** call `page.reload()` — instead, `page.waitForFunction(() => document.body.textContent.includes('2 of 2 here'), null, { timeout: 10000 })`. The host's meta-refresh has 5s interval, so 10s should comfortably catch the next refresh cycle even with KV propagation. If this times out, the meta-refresh polling is broken — STOP and report; do not patch.
 
-   a) **Static regression guard.** Walk to the answer view (host + partner joined, deck active) and assert the HTML response does **not** contain `http-equiv="refresh"`. Use whichever helper you used for the previous walkthrough — `request.get` of the inside view after both have joined is fine. One assertion is enough. Comment the assertion line briefly: `// regression guard: the answer view must not auto-refresh — it would clear the textarea`.
+3. **Waiting-for-reveal view auto-transitions to reveal when partner submits.** Two contexts, both joined, both on the answer view. Host types and submits an answer. Host's page should now be on the waiting-for-reveal view ("You've submitted. Waiting for the others."). Then partner types and submits. On the host's page, `page.waitForFunction` until the body contains "Move to the next prompt" (the reveal-view CTA), within 10s. If this times out, the reveal-step polling is broken.
 
-   b) **Real browser-context test.** Use `test()` with `page` and a second `browser.newContext()` (same pattern as the GET-share-link test added in the previous hotfix). The test must:
-      - Host starts a session via `page.goto('/')` and submitting the form. Read the share URL.
-      - Partner in a second context: `page.goto(<shareUrl>)`, click "Join this session", land on the inside view.
-      - Both pages should now be on the answer view (prompt 1).
-      - In the host's `page`, type a long-ish answer into the textarea (e.g. `"Lorem ipsum dolor sit amet, consectetur adipiscing elit."`).
-      - Wait **at least 6 seconds** with `page.waitForTimeout(6000)`.
-      - Assert the textarea still contains the typed text — `await expect(page.locator('textarea[name="text"]')).toHaveValue(<the text>)`.
-      - The test does not need to walk the rest of the deck; the regression we're guarding is "typing survives the polling interval".
-   
-   Together (a) and (b) close the test gap: (a) is the cheap static check that fails the suite even if Playwright timing changes, (b) is the user-experience proof. Both must land in this task.
+4. **Reveal view renders both answers with correct Participant A / B labels.** Continue from test 3 (or set up fresh). Once the host is on the reveal view, assert: the page contains "Participant A" and "Participant B" exactly once each (use `page.locator('text=Participant A')` count = 1). Assert the answer text submitted by the *first joiner* is rendered next to "Participant A" and the second joiner's text next to "Participant B". To do this, type **distinct, recognisable strings** in test 3 (e.g. `"hostAnswerForReveal-12345"` and `"partnerAnswerForReveal-67890"`) and locate them by partial text match.
 
-3. **Do NOT change**:
-   - The other two `<meta refresh>` lines (439, 507). They serve a real purpose and have no input to destroy.
-   - The session schema. KV. Cookies. Routes.
-   - The share URL or any other route surface.
-   - `apps/blog/`. `coordination/decision-log.md`.
-   - The CSS, HTML structure, or copy beyond the single deletion above.
+5. **Complete view's clipboard button is wired and works.** Walk through the deck (5 prompts × 2 participants × submit + advance). On the complete view, `await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])` for the host's context, click `#copy-recap`, then `const clipText = await page.evaluate(() => navigator.clipboard.readText())`. Assert the clipboard text contains "Roundtable — conversation recap", contains all 5 prompt texts (use the `prompts` exported from `apps/product/src/prompts.ts` — import it in the test file), and contains the "does not provide financial, tax, legal, or investment advice" disclaimer line. If clipboard permissions don't work in headless Chromium for any reason, fall back to checking the inline `<script>` content for the recap text and asserting the click handler is wired (the existing static check already covers the latter — extend it). Do NOT skip this — at minimum confirm the recap content is present in the served HTML.
 
-4. **Deploy.** `pnpm --filter product deploy` must succeed. After deploy, the full Playwright suite (existing 7 + new 2) must pass against the deployed URL via `PRODUCT_URL=...`.
-
-5. **Manual sanity check** before claiming. Open the deployed URL in a real browser (or use `curl` to fetch the answer view's HTML and grep). Quick check via curl:
-   ```
-   # POST /sessions, follow redirect, POST /s/<code>/join with second cookie, then GET /s/<code> with first cookie — that should now land on the answer view since both joined.
-   # Or simpler: grep the source of the answer view directly.
-   ```
-   The simplest manual check: after deploy, run
-   ```
-   curl -s https://rivals-team-alpha-product.kevin-wilson.workers.dev/s/<code> -H 'Cookie: rt_pid=<host-pid>' | grep -c 'http-equiv="refresh"'
-   ```
-   on a session where both have joined; expect `0` if the response is the answer view. Or check the simpler invariant: write a tiny grep over the locally-built bundle that confirms only two refresh tags remain in the worker output, not three. Use whichever evidence is easier to capture and paste it in the review-queue claim.
+6. **"Session not found" path under a real navigation.** `page.goto('/s/NOTREAL')` should land the user on a 404-flavoured page with the copy "This session has ended or never existed" and a working "Back to the start" link to `/`. Assert `page.title()` indicates a not-found state and that clicking the back link returns the user to the landing page (the "Start a session" form is visible again). This is distinct from the existing `request.get('/s/NOTREAL')` test because it exercises the rendered HTML *and* the back-link's reachability.
 
 Constraints:
-- Stay inside `apps/product/`. Do not touch `apps/blog/` or `coordination/decision-log.md`.
-- TypeScript: no `any`, named exports, curly braces on every conditional.
-- British English for any new copy (probably none — this is a deletion).
-- Do not sign commits.
-- Two commits is fine: deletion + test additions. Do not split further.
+- **No production code changes.** Do not modify `apps/product/src/*.ts`, `apps/product/wrangler.jsonc`, `apps/product/src/prompts.ts`, or any user-facing copy. The whole task is in `apps/product/tests/smoke.spec.ts`.
+- If any test fails, **stop**: set Status to `blocked`, paste the failure output and your hypothesis about which surface is broken, and hand back. Do not patch the production code in-line. The Orchestrator will write a hotfix decision.
+- Reuse existing helpers where possible (the test file already has helpers from previous tasks). Do not refactor existing tests.
+- TypeScript: no `any`, named exports, curly braces on every conditional. Importing from `apps/product/src/prompts.ts` in the test is fine.
+- British English in any new helper strings, test names, or comments. (Test names like `'landing form click submits and lands on the host view'` are fine.)
+- Do not sign commits. One commit is fine for all six tests; if you split, split per-test (six commits) — not per cluster.
+- Do not deploy. **Tests run against the deployed URL via `PRODUCT_URL=...` in the suite invocation; you don't need a fresh deploy.** A deploy is only required when production code changes — none does here.
 
 Definition of done:
-- Line 472 of `apps/product/src/index.ts` (the `<meta http-equiv="refresh">` inside `renderAnswerView`) is removed.
-- Lines 439 and 507 are unchanged.
-- Both new tests (static refresh-absence + browser-context type-and-wait) pass locally and against the deployed URL.
-- Existing 7 Playwright tests continue to pass.
-- `pnpm --filter product deploy` succeeds.
-- Entry appended to `coordination/review-queue.md` describing the bug, the change, and your manual evidence.
+- Six new `test()` blocks land in `apps/product/tests/smoke.spec.ts`.
+- All existing tests still pass.
+- All six new tests pass against `wrangler dev` locally **and** against the deployed URL via `PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev`.
+- Total suite goes from 9 tests to 15.
+- Entry appended to `coordination/review-queue.md` describing the sweep, listing the surfaces covered, and noting whether any of the six surfaces required a follow-up (i.e. did any of the new tests reveal an existing bug?).
 - Status field below set to `awaiting-review`.
 
-Out of scope:
-- JS-based polling.
-- localStorage / sessionStorage persistence of textarea contents.
-- Durable Objects or WebSockets migration.
-- Any feature work, copy revision, or schema change.
-- A blog post.
-- A third rival check.
+If you are blocked:
+- Status `blocked` with a one-line description of which test failed and what it surfaced.
+- Do not push partial code that papers over a failing test.
 
-**Assigned:** 2026-05-01 04:25 UTC — Engineer
-**Status:** awaiting-review
-**Notes:** Second P0 today. The actual code change is one deleted line. The tests are the load-bearing part of the task — without them we will trip the same wire on the next polling-related decision. ~30 minutes. Shipped as commits `5642599` (deletion) and `32c8973` (two new tests); deployed Worker version `fa5b9f6e-b94f-4d97-a866-9316213f1fd6`; full 9-test Playwright suite green against the deployed URL; live answer view (both joined) has zero `http-equiv="refresh"` occurrences; review-queue entry appended.
+Out of scope:
+- Production code changes.
+- Replacing meta-refresh polling with JS or WebSockets.
+- Realtime / Durable Objects.
+- Any feature work, copy revision, schema change, route addition, or new dependency.
+- A blog post.
+- A rival check.
+
+**Assigned:** 2026-05-01 04:55 UTC — Engineer
+**Status:** assigned
+**Notes:** Time budget: ~60 minutes. This is a deliberate test-debt paydown after two P0s today. Tests are the deliverable; finding a bug counts as success — the Orchestrator handles the hotfix decision separately if you find one.
