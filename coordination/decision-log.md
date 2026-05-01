@@ -244,3 +244,40 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - Sets up the next feature task with real coverage in place, so a regression in any of the existing surfaces will be caught at PR time.
 
 **Reversible?** Trivially. Tests can be deleted. None of them touch production code. The only reason we would remove them is if they became flaky — and even then, the right move is to fix the flake, not delete the test.
+
+---
+
+## 2026-05-01 05:40 — Next product axis: plurality, not breadth
+
+**Context:** The rival just shipped a second conversation arc (`?arc=open` and `?arc=purchase`) — see rival-state entry 05:30. They have picked breadth (more decks for more occasions) as their next product axis. We need to pick our next product axis. The candidate set from the rival-state implications field:
+
+- (1) **Match breadth**: add a second arc to Roundtable.
+- (2) **Depth**: add an end-of-deck joint sentence ("what we've each taken from this") for a shared closing beat.
+- (3) **Resilience**: replace meta-refresh polling with Durable Objects + WebSockets.
+- (4) **Plurality**: support 3+ participants gracefully — currently the count copy lies past 2 ("3 of 2 here"), the reveal layout assumes a pair, and the participant labels stop at A/B in our prose even though the cap allows 4.
+
+**Choice: Option (4), Plurality.**
+
+**Rationale:**
+- *Distinctive from the rival.* They are locked into a "two people, one device, side by side" framing in their landing copy. Picking plurality stakes out an axis they cannot easily follow without re-architecting their UI premise. The brief's evaluation question "where did you and the rival diverge, and what does that suggest" gets a sharper answer.
+- *On-brief.* `BRIEF.md` says "A household of two or more adults". We have been treating "two or more" as effectively "two" — a household of three (e.g. two parents and an adult child sharing a roof and some finances; an adult sibling; a co-living arrangement) is explicitly in scope. Generalising to ≥2 honours the brief, doesn't broaden it.
+- *Closes a known correctness bug.* The Reviewer flagged "3 of 2 here" as an existing copy issue back in the original session-handshake review. We've been carrying it as a future-copy item ever since. Doing plurality now retires the issue at the same time as expressing the axis.
+- *Modest scope, contained surfaces.* The session schema already allows up to 4 participants (set in the original `joinSession` cap). The work is in *render*, not *storage*: count copy, participant labels, reveal layout, recap text, "all here" / "all submitted" predicates. No new routes. No schema change.
+- *Identity-preserving.* The deck stays five prompts, fixed order. Simultaneous reveal stays the mechanic. We are deepening *who can be in a session*, not changing what a session is.
+
+**What we considered and rejected, briefly:**
+- *Match breadth (option 1).* Tracking the rival's last move within the hour is the wrong shape for a process-evaluated brief. We would look derivative. The brief actively rewards a divergent decision trail.
+- *Depth — joint closing sentence (option 2).* Strong on identity but mechanically more invasive than plurality (introduces a post-deck pre-complete state) and would obscure rather than retire the known plurality copy bug. Defer; it remains an attractive future move.
+- *Resilience — WebSockets/DOs (option 3).* The 5-second polling delay is a real but small degradation. We just spent the previous slot on test debt; spending the next on infra debt has diminishing returns and no visible product story for the brief's evaluators. Defer until product evidence (a real user complaint about polling lag) makes it priority.
+
+**Scope of the next Engineer task:**
+- Generalise the participant count copy on the waiting-for-joiner view from "1 of 2 here" / "X of 2 here" to "X here so far. Two are needed before the conversation begins." (or equivalent). The "everyone has joined and we're ready" beat is "X here. Tap below when everyone is in." with an explicit "Begin the conversation" CTA that the host clicks once they confirm everyone present is in. Reason: with ≥2 the system can no longer auto-start the moment two are joined — three or four people may still be arriving.
+- New state: the session needs a `startedAt: number | null` field. `createSession` initialises it to null. A new `startSession(kv, code, participantId)` exported helper sets it to `Date.now()` when the host (the first joiner — `participants[0]`) clicks "Begin the conversation". Until then, the inside view is the waiting view for everyone, regardless of count.
+- New route: `POST /s/:code/begin` — only the host (participants[0]) can call it. Returns null if non-host caller, redirects to `/s/<code>` otherwise.
+- Generalise participant labels. Render `Participant A` … `Participant D` based on `joinedAt` order, not "Participant A / B" hardcoded. Reveal layout uses CSS grid with `auto-fit, minmax(min(100%, 18rem), 1fr)` so 2/3/4 answers wrap gracefully on narrow screens without rewriting markup per count.
+- Generalise reveal-lock and `advanceSession`. The current rule "advance only when *every currently-joined participant* has submitted" already generalises; we just need to confirm tests still hold with 3 participants.
+- Generalise recap text. `Participant X: <answer>` lines for as many participants as joined, in joinedAt order.
+- Update tests: add a 3-participant walkthrough that joins three browser contexts, hosts begins, walks two prompts (not the full deck — keeps the test fast), confirms reveal shows three labelled answers, recap contains all three for each prompt. Keep the existing 2-participant tests as-is.
+- Footer/disclaimer copy unchanged.
+
+**Reversible?** Mostly yes. Reverting would mean re-hardcoding the "of 2" copy, removing the host-begins CTA (or auto-starting at 2), and dropping `startedAt`. None of those would break sessions in flight if we kept the field nullable.
