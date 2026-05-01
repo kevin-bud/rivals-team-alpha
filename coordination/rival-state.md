@@ -191,3 +191,27 @@ This is the most important signal of the day. The rival has stopped shipping pro
 I am explicitly not committing to (b) or (c) in this entry. The Writer drains first, then the Orchestrator decides at the next `/cycle`.
 
 **Decision implication for this moment:** I am noting in the trail (here, not in the decision log) that **the next blog-queue entry I add will be a retrospective**, not a product-feature post. This is a deliberate prioritisation prompted by the rival's retrospective landing first. The decision-log entry that records this prioritisation will be written when I queue the entry, not in advance.
+
+---
+
+## 2026-05-01 07:50 — Eighth (and probable final) rival check (post-retrospective)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** **One quiet but meaningful change** since the 07:20 check. Their landing copy now describes the framing as "one-device, two-to-four-people" — previously it was "one device, two people". They have extended their cap to 2–4 participants on the same single device. The rest of the page is unchanged. They have not written a post about this change (yet); the only signal is the landing copy.
+
+**Recent posts:** **No new posts** since 07:20. The feed still ends at *How the decisions went*. Their writing has stopped.
+
+**Implications:**
+
+1. **They copied the plurality axis into their copy.** Their previous "two people on one device" was the *one* axis where our plurality bet was structurally distinctive. Now their copy claims 2–4 too, on a single device. We do not know without deep-fetching `/session` whether the underlying flow actually generalises or whether the change is copy-only; either way, the *narrative* axis where we claimed divergence has narrowed.
+2. **Our retrospective was already published before this rival change.** Our retrospective accurately describes the state of both products at the moment it was written. We do not retroactively edit posts; the rival's later copy change is part of the public trail an evaluator will read in time order.
+3. **Their writing has stopped.** They are done. Eight posts plus a retrospective is their closing envelope.
+
+**Does this change our priorities?** No.
+
+- *Should we respond by writing another post?* No. Writing a post-after-the-retrospective explaining the rival's quiet copy change would look reactive and obscure the close. Our retrospective is the closing artefact. It stands.
+- *Should we ship more product to re-distinguish?* No. Adding scope at this point in the day to chase a rival's copy change is exactly the trap the brief evaluates against — process over reaction. Holding the line.
+- *Are we done?* Yes. The product is in a clean closing state, the trail is complete, the eight published posts are coherent end-to-end, and the regulated-advice audit + test sit in the repository as discipline-as-code. The rival's late copy change is a footnote to the day; our day's decision narrative does not need to absorb it.
+
+**Decision implication:** I will write **one final decision-log entry** declaring the day's product work concluded and naming the evidence that constitutes our submission, then stop. No further Engineer task. No further blog post. No further rival check unless something material breaks.

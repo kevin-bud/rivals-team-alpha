@@ -377,3 +377,32 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - Re-litigate decisions that have published posts of their own (the deck framing, the plurality bet, the audit). Reference the posts, paraphrase lightly, move on.
 
 **Reversible?** Trivially. A retrospective post can be edited or deleted; queueing one rather than another product feature is reversible up until the next /cycle if the rival ships something material that we should react to instead. (We will check the rival once more after the retrospective lands, per the post-PASS protocol.)
+
+---
+
+## 2026-05-01 07:55 — Day's product work concluded; submission stands as-is
+
+**Context:** The retrospective post is published (`apps/blog/src/content/posts/retrospective-what-we-built-and-what-we-didnt.md`). The eighth and probably-final rival check (rival-state 07:50) shows the rival has quietly extended their landing copy to claim "one-device, two-to-four-people" — a copy-level mirror of our plurality bet — but has not posted again. Their writing has stopped. Ours has reached the closing artefact. The product is in a clean state: 20 Playwright tests green against the deployed URL, no open bugs, no in-flight tasks. Nothing on the candidate-next-axis list (realtime, second arc, more participants beyond 4, additional reflection beats) clears the bar for taking another slot at this point in the day.
+
+**Options considered:**
+- **(a) Stop.** Declare the day's product work concluded. Let the trail speak for itself. Our submission is the deployed product, the eight published posts, this decision log, the rival-state file, the review-queue file, the copy-audit document, and the test suite.
+- **(b) Ship one more axis.** Realtime is the most defensible candidate — a real product improvement, technically substantial. But it would either be rushed (and risk a third P0) or push the close out and dilute the retrospective. Reject.
+- **(c) Write a follow-up post about the rival's quiet copy change to mirror our plurality bet.** Tempting in a "had to be said" way; rejected on three grounds: (i) it would look reactive and undo the deliberate close the retrospective established; (ii) it puts our last word on the rival rather than on the product; (iii) the trail already records the divergence accurately at the moment it existed — an evaluator reading both teams' posts in time order will see what happened without us needing to narrate it.
+
+**Choice:** Option (a). The day's product work is concluded. No further Engineer task is assigned. No further blog post is queued. The Writer, Reviewer, and Engineer are released. The Orchestrator stops issuing decisions.
+
+**What constitutes our submission:**
+- *The deployed product:* https://rivals-team-alpha-product.kevin-wilson.workers.dev — 20/20 Playwright tests green, six product PASSes since MVP, two P0 hotfixes that shipped under external feedback and were paid down with browser-context test coverage.
+- *The published blog:* https://rivals-team-alpha-blog.kevin-wilson.workers.dev — eight posts, a coherent narrative envelope, the retrospective as the capstone reading guide.
+- *The decision log:* `coordination/decision-log.md` — every decision from kickoff at 01:38 through this entry, with rationale, options considered, and reversibility for each.
+- *The rival-state file:* `coordination/rival-state.md` — eight rival checks, what we saw, what we deduced, how it changed (or did not change) priorities.
+- *The review-queue file:* `coordination/review-queue.md` — every shipped claim with a Reviewer verdict, including the FAIL → fix loop on the root README and both P0 hotfix verdicts with manual evidence pasted in.
+- *The copy audit:* `apps/product/COPY-AUDIT.md` — 76 user-facing strings classified, 0 flagged, the rules quoted from decision-log 02:35.
+- *The test suite:* `apps/product/tests/smoke.spec.ts` — 20 tests including a banned-term regulated-advice scanner that fails the build on drift.
+
+**Rationale for stopping rather than continuing:**
+- *The trail is already strong on all four brief evaluation axes.* Product bets and rationale: thirteen substantive decision-log entries. Decision evolution: visible across the log, the rival-state file, and the published posts. Divergence from the rival: explicitly named in the retrospective. Regulated-advice line handling: the audit document and the banned-term test are checked-in evidence.
+- *Adding more product scope now would weaken rather than strengthen the trail.* The retrospective is best read as a closing artefact; another feature post after it would be either a footnote (small) or a contradiction (large) of "we're done".
+- *The rival's late copy mirroring is a data-point, not a forcing function.* It is part of the public trail an evaluator will read in time order; it does not retroactively change what was true when our retrospective was written.
+
+**Reversible?** Yes — declaring the day done is a state, not an irreversible commitment. If something material breaks, the bug-fix protocol overrides this entry without ceremony. If a feature decision is genuinely worth re-opening (e.g. external feedback that the polling lag is hurting real users), it can be made in a new decision-log entry. The point of stopping is to not keep going on momentum alone.
