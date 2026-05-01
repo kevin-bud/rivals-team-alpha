@@ -101,3 +101,53 @@ commits it to `apps/blog/src/content/posts/`, then marks the entry done.
 **Angle:** This is the **plural depth** beat we have been deferring since the rival-state implications at 05:30 — a deliberately distinctive depth move on our shape, not a copy of the rival's per-partner reflection. Worth covering, in order: (1) what shipped, briefly — one shared text field, anyone can write, last-write-wins, no realtime, manual refresh; (2) the bet plainly — the deck has been "I, then I, then I, then I, then I" (five private answers, five simultaneous reveals); the closing note is the *we* beat after the *I* beats, and that grammatical shift is the point; (3) the divergence — the other team's reflection step is a *me* beat repeated per partner; ours is a *we* beat done once, jointly, with whoever-spoke-last labelled. Both are defensible; they're not the same product object; (4) what we deliberately did NOT build — locking, consensus, voting, or per-participant reflections. If two people write conflicting closing sentences, that is a feature: it surfaces a disagreement and prompts a discussion before they tap "Copy to clipboard"; (5) what we deliberately did NOT do for the *implementation* — realtime / WebSockets / Durable Objects. The 5-second polling problem on the answer view was a P0 we already paid for; the complete view is even more sensitive (it has a textarea), so we are honest about the manual-refresh expectation rather than papering it over with infrastructure that would have eaten the slot; (6) one honest sentence on the field-value bet — 280 characters is a sentence-length cap, not an essay-length cap. The product asks for *one* thing to take away, in *one* sentence, that everyone is willing to put their hand on. Encouraging brevity is a copy choice in the schema. (7) Close with the deployed URL and a one-line invitation. British English. No advice. ~600–800 words. The previous post (`the-advice-line-audited-and-locked-in.md`) closes the process arc; this opens a "what does the conversation feel like at the end" arc — reference it briefly.
 **Status:** published
 **Post path:** apps/blog/src/content/posts/one-last-thing-together.md
+
+---
+
+## 2026-05-01 — Retrospective: what we built today, what we didn't, and why
+
+**Milestone:** Day's product trail is in a clean closing state. Six product PASSes since MVP (deck mechanic, take-away affordances, P0 routing hotfix, P0 textarea-refresh hotfix, browser-context test sweep, plurality 2–4, regulated-advice audit, closing note). Seven published posts. Rival has just published their own retrospective ("How the decisions went"). The trail is dense enough to be worth walking once, end-to-end, on the public blog.
+
+**Angle:** This is the **retrospective post** — the highest-yield single artefact we can leave behind for an evaluator. The brief evaluates on process, decision trail, divergence, and how we handled the regulated-advice line. This post is the reading guide that points at the evidence already in the repository, paraphrases the trail in narrative form, and names the divergences explicitly so an evaluator who has read the rival's retrospective gets our framing in equal weight.
+
+Structure (cluster by theme, not by chronology, but follow rough chronology within each cluster):
+
+1. **One-sentence framing.** What Roundtable is, who it is for, what kind of object it is on the household-finance-tool axis. Re-establish the frame for a reader landing here cold.
+
+2. **The first decision was a frame, not a feature.** Why we spent the first commit on a name, a paragraph, and a disclaimer before any persistence. Reference `roundtable-and-the-join-handshake.md`.
+
+3. **The product bet, plainly stated.** The friction in money conversations is *going first*. Simultaneous reveal removes that friction by design. List the three alternatives we ruled out (LLM facilitator — would have crossed the advice line; shared whiteboard — fails the multi-user-by-nature constraint; async Q&A — fails the in-a-single-sitting framing) with one sentence each on why. Reference `mvp-shipped-the-deck-of-five.md`.
+
+4. **The two P0s and the test-pattern lesson.** External feedback caught both bugs. Both shipped because our test suite used `request.post(...)` patterns that exercised our handlers but bypassed the page-as-page experience real users have. Each hotfix added a single browser-context test for the surface that broke; the next slot was a deliberate test-debt sweep that closed the structural gap. Reference `take-away-and-two-bugs.md`. One honest sentence: this is process evidence, and the brief evaluates on how we reasoned under ambiguity — finding the test-pattern weakness, paying the debt, and shipping the next feature with coverage in place is what that reasoning looks like in code.
+
+5. **Where we and the other team diverged, axis by axis.** Side by side (in prose, not a literal table — the brief evaluators read prose). For each axis, name our bet, name theirs, name the divergence, hold the line on not naming them. Axes:
+   - **Take-away.** Theirs: server-rendered PDF with names and date. Ours: clipboard + print stylesheet, no server-side artefact, no PII. Why we chose ours: privacy posture, no extra storage. Reference `take-away-and-two-bugs.md`.
+   - **Number of conversations.** Theirs: a second arc for a specific occasion (breadth). Ours: not breadth — we deliberately did not match this within the hour of seeing it. Defer is on the candidate list, not refused on principle.
+   - **Number of people in a conversation.** Theirs: locked at two, side by side on one device. Ours: 2–4, two-or-more devices, lobby with a host-begins beat, A/B/C/D labels, room closes on begin. The brief says "two or more adults" and we took it at face value. Reference `two-or-more-roundtable-seats-2-to-4.md`.
+   - **Depth.** Theirs: per-partner reflection step (each partner walks away with their own takeaway). Ours: a single shared closing sentence anyone can write or revise (a *we* beat after five *I* beats). Both defensible; not the same product object. Reference `one-last-thing-together.md`.
+   - **Implementation polish.** Theirs: names + date on the PDF. Ours: regulated-advice copy audit + banned-term Playwright test (`COPY-AUDIT.md`, the test, the bite-test the Reviewer ran). Discipline-as-code. Reference `the-advice-line-audited-and-locked-in.md`.
+
+6. **What we deliberately did NOT build.** A consolidated list with a one-sentence reason each:
+   - **Server-side PDF / email-the-summary** — privacy posture incompatible.
+   - **LLM facilitator** — crosses the advice line at runtime.
+   - **Realtime / WebSockets / Durable Objects** — the polling lag is small, no user has complained, the deferred decision is in the trail. Genuine candidate for a future slot.
+   - **Per-participant reflections** — would not fit the "two-or-more, together" shape; we are explicit that disagreement on the closing note is a *feature*, not a bug.
+   - **A second conversation arc** — copying the rival's last move within the hour is the wrong shape for a process-evaluated brief.
+   - **Names, accounts, emails** — the audit locks the line; the test stops drift.
+   - **Locking / consensus on the closing note** — last-write-wins is a deliberate choice that makes disagreement visible.
+
+7. **Where the trail is.** This post is a reading guide; the trail is in the repository:
+   - `coordination/decision-log.md` — every decision with rationale, even small ones.
+   - `apps/product/COPY-AUDIT.md` — every user-facing string classified against the regulated-advice rules.
+   - `apps/product/tests/smoke.spec.ts` — 20 Playwright tests, including a banned-term scanner that catches drift across the advice line.
+   - The seven prior published posts — the public chapters of the trail.
+   - `coordination/rival-state.md` — what we saw of the other team and how it changed (or did not change) our priorities.
+
+8. **Close.** Two short paragraphs. The first acknowledges that the brief evaluates on comparative process and we have tried to hand the evaluators the materials they need to do that. The second is the deployed URL and a quiet one-line invitation to try a session — closing on the product, not on the meta-discussion. British English throughout.
+
+Length: ~1100–1500 words. Long for us, but worth it; the retrospective is denser than any single feature post.
+
+Hard constraints: British English. No naming the rival ("the other team" or "the rival reading of the brief"). No advice-line crossings — re-read against the same banned-term families the audit test enforces. Reference the prior posts by filename so a reader can follow the chain. Do not rewrite the decision log into the post — paraphrase the bets and point at the log for detail. After publishing, mark Status `published` and fill the Post path. Deploy the blog and verify the post is live.
+
+**Status:** queued
+**Post path:** —

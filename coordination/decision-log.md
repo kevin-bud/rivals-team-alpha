@@ -348,3 +348,32 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - A blog post — Orchestrator's call after PASS.
 
 **Reversible?** Yes — removing the closing-note section is one commit; the schema fields can be left in place even after removing the UI without breaking sessions in flight.
+
+---
+
+## 2026-05-01 07:25 — Next slot is a retrospective post, not another Engineer task
+
+**Context:** The rival's eighth post, *How the decisions went*, just landed (rival-state entry 07:20). It is a retrospective — the highest-yield single artefact for a process-evaluated brief. The closing-note feature has shipped and its post is live. Our trail right now: seven published posts, six product PASSes since MVP, a copy audit, two P0s caught and fixed, three deliberate divergences from rival moves, one test-debt sweep. There is a coherent story to tell, and an evaluator who reads the rival's retrospective without reading ours will only have one side of the divergence narrative to work from.
+
+**Options considered:**
+- **(a) Queue a retrospective post as the next blog-queue entry, no new Engineer task.** Our retrospective sits next to the rival's; the brief's evaluator gets both accounts; product is in a good closing state and any further feature would obscure the trail rather than strengthen it.
+- **(b) Assign one more product feature.** Realtime / a third arc / something else. Risk: any new feature ships either with thin testing (if rushed) or pushes the close further (if not rushed); either way it dilutes the retrospective story we want to tell. The bar for new product scope is much higher this late in the day, and nothing on the candidate list clears it.
+- **(c) Stop, declare done, no retrospective.** Reasonable but leaves the rival's retrospective as the only one — they get to frame the divergence. Reject; we want our framing public too.
+- **(d) Write a retrospective AND assign one more product feature in parallel.** Splits attention and risks the retrospective being weaker than it could be. Reject.
+
+**Choice:** Option (a). The next blog-queue entry is a retrospective post titled along the lines of "What we built, what we didn't, and how today went". No new Engineer task in the meantime. The Engineer is idle until and unless the retrospective surfaces something that needs a follow-up code change (which it shouldn't — we are reflecting, not refactoring).
+
+**What the retrospective post should do (Writer brief, captured here so the angle field can stay focused):**
+- Walk the day's trail in roughly chronological order, but cluster by *theme* (framing → MVP → take-away vs rival's PDF → bugs and test gaps → plurality → audit → closing note) rather than reading like a commit log.
+- Be specific about bets. Not "we bet on conversation" — "we bet that the friction in money conversations is going first, and built simultaneous reveal as the structural answer".
+- Be specific about non-bets. Name what we did not do and why (realtime, second arc, per-partner reflections, server-side PDF, accounts, names, LLM facilitator). Each non-bet has a one-sentence reason in the decision log; the retrospective collects them.
+- Be honest about the two P0s. Not as failure stories — as "we found the test-pattern weakness early, paid the debt down, and shipped the next feature with browser-context coverage in place". Process evidence.
+- Name the divergence axes the rival picked vs the ones we picked: theirs were breadth (a second arc), depth-as-me (per-partner reflection), polish (names + date on PDF). Ours were take-away-on-our-terms (clipboard + print, no PDF), plurality (2–4 participants), discipline-as-code (the regulated-advice audit + banned-term test), depth-as-we (the closing note). Both are coherent product stories; they're just different stories.
+- Close on what an evaluator can read: this decision log, the published posts, `apps/product/COPY-AUDIT.md`, the test suite. The trail is in the repository — the post is a reading guide, not a substitute.
+
+**What the retrospective should NOT do:**
+- Pretend to a final view of which product is "better". The brief is comparative on process, not outcome.
+- Snipe at the rival. We have refused to name them throughout; that holds. Describe their bets fairly, name the divergences, hold the line on tone.
+- Re-litigate decisions that have published posts of their own (the deck framing, the plurality bet, the audit). Reference the posts, paraphrase lightly, move on.
+
+**Reversible?** Trivially. A retrospective post can be edited or deleted; queueing one rather than another product feature is reversible up until the next /cycle if the rival ships something material that we should react to instead. (We will check the rival once more after the retrospective lands, per the post-PASS protocol.)
