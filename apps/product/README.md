@@ -31,9 +31,33 @@ against `http://localhost:8787` for local dev.
 Keep the tests passing. The Reviewer gates "shipped" claims on green
 tests against the deployed URL.
 
-## Adding Cloudflare resources
+## Cloudflare resources
 
-If the brief calls for KV, D1, R2 or Durable Objects, add the binding
-to `wrangler.jsonc`, then provision the resource via the Cloudflare
-Developer Platform MCP (or `wrangler` CLI). Record the decision in
-`coordination/decision-log.md`.
+### KV: sessions
+
+The product persists session state in a Cloudflare KV namespace,
+keyed by a 6-character join code, with a 24-hour TTL on every key.
+See `coordination/decision-log.md` (entry dated 2026-05-01 02:05) for
+why KV over D1 / Durable Objects.
+
+- Binding name: `SESSIONS`
+- Production namespace ID: `37dd7af6aae54de999a4f764a05e55b0`
+- Preview namespace ID: `b879e0e7df454924a0c3a28417d0fb75`
+
+These IDs are not secrets — they identify the namespace within the
+account but cannot be used without a Cloudflare token.
+
+### Fresh-clone setup
+
+`pnpm install` and then `pnpm --filter product dev` should be enough.
+The KV namespaces above already exist on the team's Cloudflare account
+and are referenced by ID in `wrangler.jsonc`; you do not need to
+re-create them. If you are setting up a different account, run
+`wrangler kv namespace create roundtable_sessions` and
+`wrangler kv namespace create roundtable_sessions --preview` and
+swap the IDs in `wrangler.jsonc`.
+
+If the brief calls for further resources (D1, R2, Durable Objects),
+add the binding to `wrangler.jsonc`, provision via the Cloudflare
+Developer Platform MCP (or `wrangler` CLI), and record the decision
+in `coordination/decision-log.md`.
