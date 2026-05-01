@@ -23,6 +23,7 @@ export type Session = {
   currentPromptIndex: number;
   answers: Record<string, Record<string, string>>;
   completedAt: number | null;
+  startedAt: number | null;
 };
 
 const sessionKey = (code: string): string => `session:${code}`;
@@ -64,6 +65,7 @@ const hydrateSession = (raw: string): Session => {
     currentPromptIndex: parsed.currentPromptIndex ?? 0,
     answers: parsed.answers ?? {},
     completedAt: parsed.completedAt ?? null,
+    startedAt: parsed.startedAt ?? null,
   };
 };
 
@@ -88,6 +90,7 @@ export const createSession = async (
       currentPromptIndex: 0,
       answers: {},
       completedAt: null,
+      startedAt: null,
     };
     await writeSession(kv, session);
     return session;
@@ -121,6 +124,12 @@ export const joinSession = async (
   if (alreadyJoined) {
     return session;
   }
+  // Once the host has begun the conversation the room closes — no
+  // late joiners can sneak in. The 4-participant cap still applies for
+  // sessions that have not started.
+  if (session.startedAt !== null) {
+    return null;
+  }
   if (session.participants.length >= MAX_PARTICIPANTS) {
     return null;
   }
@@ -130,6 +139,37 @@ export const joinSession = async (
       ...session.participants,
       { id: participantId, joinedAt: Date.now() },
     ],
+  };
+  await writeSession(kv, updated);
+  return updated;
+};
+
+export const startSession = async (
+  kv: KVNamespace,
+  code: string,
+  participantId: string,
+): Promise<Session | null> => {
+  const session = await getSession(kv, code);
+  if (session === null) {
+    return null;
+  }
+  // Only the host (the first joiner) can start the conversation.
+  const host = session.participants[0];
+  if (host === undefined || host.id !== participantId) {
+    return null;
+  }
+  // Need at least two participants in the room before the deck can run.
+  if (session.participants.length < 2) {
+    return null;
+  }
+  // Idempotent on already-started: do not re-stamp, just return what's
+  // already in KV. Caller will redirect to the inside view either way.
+  if (session.startedAt !== null) {
+    return session;
+  }
+  const updated: Session = {
+    ...session,
+    startedAt: Date.now(),
   };
   await writeSession(kv, updated);
   return updated;
