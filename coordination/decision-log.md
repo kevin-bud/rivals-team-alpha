@@ -406,3 +406,23 @@ Doing this sweep now, before any further feature work, is on-strategy: it pays d
 - *The rival's late copy mirroring is a data-point, not a forcing function.* It is part of the public trail an evaluator will read in time order; it does not retroactively change what was true when our retrospective was written.
 
 **Reversible?** Yes — declaring the day done is a state, not an irreversible commitment. If something material breaks, the bug-fix protocol overrides this entry without ceremony. If a feature decision is genuinely worth re-opening (e.g. external feedback that the polling lag is hurting real users), it can be made in a new decision-log entry. The point of stopping is to not keep going on momentum alone.
+
+---
+
+## 2026-05-01 08:00 — Final blog hygiene: remove the pre-kickoff placeholder, fix stale deploy docs
+
+**Context:** Stop-hook check after declaring the day concluded surfaced two artefact-quality issues on the public blog that would weaken our submission if left:
+
+1. `apps/blog/src/content/posts/welcome.md` — the hackathon-template placeholder titled "Project under way", dated `2026-04-29` (two days before kickoff). It still 200s at `https://rivals-team-alpha-blog.kevin-wilson.workers.dev/posts/welcome/` and appears on the index. An evaluator reading our blog in chronological order would conclude we started two days before the brief was issued, which is wrong and contradicts the decision-log timeline. The rival has the same template placeholder in their feed; they have not removed theirs, but their kept-or-removed call does not change ours.
+2. `apps/blog/src/content/posts/README.md` documents the deploy command as `pnpm --filter blog deploy`. We discovered today that this skips the Astro build and ships a stale `dist/`; the correct command is `pnpm deploy:blog` (turbo, which runs the build first). Saving the project memory caught this; the in-tree docs should match what we now know.
+
+**Options considered:**
+- **(a) Leave both.** Defensible; the trail still reads coherently. But the welcome.md actively contradicts the decision-log timeline, which is the wrong shape for a submission whose primary evidence *is* the trail.
+- **(b) Delete welcome.md, fix the README's deploy command.** Tightest cleanup. Removes a template artefact that adds nothing; corrects in-tree guidance the next contributor would otherwise trip on (we already tripped on it once).
+- **(c) Replace welcome.md with new content.** Would either bury the retrospective (if dated late) or make the chronological narrative two days too early (if dated early). Reject — the post slot is not pulling weight.
+
+**Choice:** Option (b). One small Writer task: delete `welcome.md`; replace the deploy-command line in the posts README; re-deploy the blog through `pnpm deploy:blog` so the change actually lands; verify the URL `/posts/welcome/` now 404s. No new content. No edits to existing posts.
+
+**Rationale:** Tightens the submission's evidence-quality at near-zero cost. The Writer is the right role per CLAUDE.md's hard-rule split (`apps/blog/` is the Writer's territory). The Orchestrator can't edit application directories.
+
+**Reversible?** Yes — `welcome.md` is in git history if we ever want it back.
