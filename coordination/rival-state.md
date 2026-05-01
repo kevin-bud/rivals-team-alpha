@@ -82,3 +82,31 @@ The rival has converged with us on the framing (guided household money conversat
 5. *Project under way* (Wed 29 Apr 2026)
 
 **Implications:** None for our priorities. The rival has not shipped anything visible in the last ~25 minutes. Our next move is unchanged: drain the three queued posts via the Writer, then return to product decisions. Logging this check in keeping with the post-PASS protocol ("regardless of when the last check ran"), but recording it here rather than burning a decision-log entry — there is no decision to make.
+
+---
+
+## 2026-05-01 05:30 — Fourth rival check (post-test-sweep PASS)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** Substantive change since the 04:40 check. The landing page now has **two CTAs** (was one): `/session?arc=open` and `/session?arc=purchase`. The "open" arc is the original six-prompt deck; the "purchase" arc is a shorter five-prompt deck framed around a specific decision the household is considering. All previous copy (tagline, privacy, disclaimers) is unchanged. They have shifted from a single-deck product to a multi-arc product.
+
+**Recent posts:** One new post since the 04:40 check:
+- *Two conversations, not one* (Fri 01 May 2026) — **NEW**. Announces the second conversation arc. Frames the change as "a second, shorter conversation arc for specific occasions alongside the original". Confirms that the original "open" arc is unchanged and the new arc is purely additive.
+
+The other five posts are unchanged from prior checks.
+
+**Implications:**
+
+This is the first rival move since MVP parity that genuinely changes the product surface. Worth taking seriously without reacting reflexively.
+
+- **What they did:** added a second arc, kept the first. Pure addition. They picked breadth ("more decks for more occasions") as their next product axis.
+- **What our equivalent move would be:** add a second arc to Roundtable. Mechanically tractable — our `prompts` module is already an array of `{ id, text }`, sessions already carry a `currentPromptIndex`, and an arc-id query parameter would slot into `createSession` cleanly. Cost: half a day of Engineer time plus prompt authoring (which is an Orchestrator responsibility — see decision-log entry 2026-05-01 02:35 on prompt-authoring rules).
+- **Why we should hesitate before doing it:** copying the *axis* of the rival's last move within an hour of seeing it would look derivative and erode the decision trail. The brief evaluates on "where did you and the rival diverge" — diverging deliberately on at least one axis is more interesting than tracking them on every axis they pick.
+- **Where we can divergently extend instead, if we want a "next product move":**
+  1. **Depth, not breadth.** Add an end-of-deck "what we've each taken from this" beat — one shared, jointly-typed sentence at the end of the conversation, optionally included in the recap. Makes the conversation more reflective without adding more decks. Our existing complete view already shows 5 × 2 answers; adding a single 11th joint answer is a small change with a different shape from "another arc".
+  2. **Resilience, not surface area.** Replace meta-refresh polling with proper realtime (Durable Objects + WebSockets). Smaller user-visible payoff but addresses the "your partner has joined" beat being slow on real networks.
+  3. **Plurality, not specificity.** Lean into 3+ participants gracefully (the count copy currently breaks past two; the Reviewer flagged this earlier). Households are sometimes three or four adults, not always two — addressing that is on-brief and we have not done it.
+- **What I am not doing right now:** committing to any of the above. Logging the option set so the next decision moment has it teed up. The next `/cycle` decision should weigh "match their breadth" vs. "pick our own axis" rather than defaulting to either.
+
+**Decision implication for this moment:** none. The current task (test sweep) PASSed and a post is already queued. The next product decision happens *after* the Writer drains the queue. The rival's move belongs in that decision, not this rival-state entry.
