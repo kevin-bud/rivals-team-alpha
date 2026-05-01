@@ -82,5 +82,5 @@ Out of scope:
 - Editing prompts.ts wording.
 
 **Assigned:** 2026-05-01 06:20 UTC — Engineer
-**Status:** in-progress
+**Status:** awaiting-review
 **Notes:** Time budget: ~45 minutes. The hard part is the audit; the test should be straightforward once the disclaimer block is marked up. If a flagged string appears, stop — do not silently rewrite copy without a decision.

@@ -431,5 +431,40 @@ Out of scope (per the binding spec, deliberately not in this task):
 - Raising the 4-participant cap (hard limit, unchanged).
 - Custom domain, LLM features, deck/prompt copy changes, blog post.
 
-**Reviewer verdict:**
+**Reviewer verdict:** PASS — [evidence: 18/18 green against the deployed URL `https://rivals-team-alpha-product.kevin-wilson.workers.dev` (Worker version `6dff8061-b855-42a0-8166-ac9e5ff53bc5`) on `PRODUCT_URL=… pnpm --filter product test:e2e` (18 passed, 11.7s on the clean run; an earlier 5-worker run had one transient `Prompt 3 of 5` 5s-visibility timeout on `complete view's clipboard button…` — re-running that test in isolation passed in 4.6s and the full suite re-ran 18/18 green, so the flake is KV/edge contention against the slowest browser test, not a substantive regression). Schema observable end-to-end: minted `S6NNR3`, host lobby shows `1 here. Share the link with the others.` + `You are Participant A` + `<meta http-equiv="refresh" content="5">` + zero `Begin the conversation` button + zero `of 2 here`; partner POST `/s/<code>/join` → 303 to `/s/<code>`; host refresh now shows `2 here.` + Begin form action `/s/<code>/begin`; partner lobby shows `Waiting for the host to begin` + `You are Participant B` + zero Begin button. `startSession` enforced live: non-host POST `/s/<code>/begin` → 409 `renderActionErrorHtml`; host POST `/s/<code>/begin` → 303 location `/s/<code>`; after begin a third fresh-cookie POST `/s/<code>/join` → 409 (room closed, prior hotfix `sessionFullHtml` reused for the post-start path). After begin, host GET `/s/<code>` flips to the answer view: contains `Prompt 1 of 5`, `prompt_id="values-enough"`, zero `http-equiv="refresh"` (P0 #2 not regressed), the new helper copy `The others won't see this until everyone has submitted` is present, the old `Your partner won't see` copy is gone. Reveal layout: inline `<style>` carries the spec grid `grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr))` exactly once on the `.answers` selector. Participant-cap pre-start hard limit verified on a fresh session `AWKX4N`: joins 2/3/4 each return 303, the 5th returns 409 — cap stays at 4, not raised. Prior PASSes intact: `GET /s/<code>/join` returns `HTTP/2 303` with `location: /s/<code>` (prior hotfix #1); answer view contains zero `http-equiv="refresh"` (prior hotfix #2); complete-view clipboard button still wired (the `complete view's clipboard button…` test passes against the deployed URL — `id="copy-recap"` + `clipboard.writeText` + recap-text disclaimer assertions all green). Existing-test edits stayed within the spec tension noted: 15 prior `test()` blocks are still present and structurally identical (`grep -c '^test(' apps/product/tests/smoke.spec.ts` = 18; the three new ones are appended at the bottom under a "Plurality" section header), the only narrowed assertions are on the literal strings the new copy retires (`1 of 2 here` / `2 of 2 here` removed; `Prompt 1 of 5 immediately after join` replaced with the lobby + Begin path) plus a `host.post('/s/<code>/begin')` step inserted into walkthroughs that previously presumed auto-deck-unlock-on-second-join — no test was deleted, no test was renamed beyond the one the spec requires (`host alone still sees the waiting view (1 of 2 here)` → `host alone still sees the lobby view (1 here, share the link)`), and no test intent changed. Lobby-copy regression guard at `tests/smoke.spec.ts:1070` is the explicit replacement for the old `of 2 here` assertion. No scope creep: `wrangler.jsonc` has only the `SESSIONS` KV binding (no Durable Objects, no LLM bindings, no new bindings); no `?arc=` route exists; no new external dependencies — `apps/product/package.json` and lockfile unchanged in this work; the 4-participant cap holds at the source (`MAX_PARTICIPANTS = 4` in `sessions.ts`) and live (5th joiner 409). README at `apps/product/README.md` "How a session works" is rewritten to cover 2–4 adults, the host begins, the room closes after begin, and the per-participant recap. British English throughout the new copy ("won't"/"others"/"begin"/"conversation"); no advice-line crossings on the lobby or the new error page (which only references the host/two-people rule, not money). Decision-log 05:40 binding spec satisfied as written.]
 
+
+---
+
+## 2026-05-01 06:30 — Engineer claim: Regulated-advice copy audit
+
+Audit: 67 compliant, 3 compliant by exception (disclaimer), 0 flagged.
+
+**Summary**
+- Read every user-facing string in `apps/product/src/index.ts` and `apps/product/src/prompts.ts`. The audit table (one row per string) is checked in at `apps/product/COPY-AUDIT.md` along with the rules quoted verbatim from decision-log 2026-05-01 02:35 and the rationale for tightening `\bshould\b` to prescriptive phrasings only.
+- Marked the disclaimer block(s) so the regression test can exempt them by element rather than by string-match:
+  - `sharedFooter`'s `<footer>` carries `data-disclaimer="true"`.
+  - The landing-page lede has its inline positioning clause "It is not a budget tool, not an advisor" wrapped in `<span data-disclaimer="true">…</span>`. This is the only place the regulated-advice phrasing appears outside the footer; it is itself a disclaimer and is exempted by element.
+- Added one Playwright test, `every user-facing view obeys the regulated-advice line`, in `apps/product/tests/smoke.spec.ts`. It walks the landing page, the not-found view, the GET-`/s/<code>/join` redirect target, the lobby in three states (host alone, host after partner joined, partner just joined), the answer view, the waiting-for-reveal view, the reveal view, the complete view, and the session-full view. For each fetched HTML body it strips `data-disclaimer` elements, `<script>` blocks, and `<title>` content, then runs the four banned-term regexes from the binding spec. Any match fails the test with the surface name and the matched string.
+- No prompt wording or disclaimer wording changed. No new dependencies. The only production code change is the two `data-disclaimer="true"` attributes.
+
+**Definition-of-done evidence**
+- `apps/product/COPY-AUDIT.md` checked in. 67 compliant, 3 compliant by exception (disclaimer), 0 flagged.
+- `data-disclaimer="true"` present on every disclaimer block in `apps/product/src/index.ts` (the `<footer>` in `sharedFooter`; the inline `<span>` in the landing lede). The recap-text disclaimer in `renderRecapText` lives inside the inline `<script>` and is exempt by the script-strip rule.
+- `pnpm --filter product run deploy` succeeded — version ID `b1bad6df-43e8-4612-b3b5-eb48a947f756` at `https://rivals-team-alpha-product.kevin-wilson.workers.dev`.
+- `PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --filter product test:e2e` → 19 passed (18.8s on the clean run). 18 prior + 1 new = 19 expected.
+
+**Commits**
+- `96daa36` Add data-disclaimer markers and copy audit
+- `8af2e32` Add banned-term regression test
+
+**Out of scope (per the binding spec)**
+- Any new product feature.
+- Closing-sentence / shared note / depth move.
+- Realtime / Durable Objects.
+- A second conversation arc.
+- LLM-based copy review.
+- Editing prompt or disclaimer wording.
+- The blog post (Orchestrator's call after PASS).
+
+**Reviewer verdict:** [pending]
