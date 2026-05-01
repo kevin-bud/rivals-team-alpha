@@ -214,6 +214,54 @@ const sharedStyles = `
     opacity: 0;
     pointer-events: none;
   }
+  .closing-note {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    margin: 0 0 2rem;
+  }
+  .closing-note h2 {
+    margin-bottom: 0.5rem;
+  }
+  .closing-note .helper {
+    margin-bottom: 1rem;
+  }
+  .closing-note textarea {
+    margin-bottom: 0.75rem;
+  }
+  .closing-note .last-saved {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin: 0.75rem 0 0;
+  }
+  .recap-closing {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    margin: 0 0 2rem;
+  }
+  .recap-closing h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .recap-closing .body {
+    margin: 0 0 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 1.1rem;
+  }
+  .recap-closing .last-saved {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-style: italic;
+    margin: 0;
+  }
   @media print {
     :root {
       --ink: #000;
@@ -239,11 +287,16 @@ const sharedStyles = `
     .takeaway,
     .takeaway-actions,
     a.back,
-    .copy-buffer {
+    .copy-buffer,
+    .closing-note {
       display: none !important;
     }
     .recap-item {
       page-break-inside: avoid;
+    }
+    .recap-closing {
+      page-break-inside: avoid;
+      border: 1px solid #999;
     }
     .answer-card {
       border: 1px solid #999;
@@ -378,6 +431,24 @@ const labelForIndex = (idx: number): string => {
   return `Participant ${letter}`;
 };
 
+// HH:MM in UTC, no timezone conversion. Server-side string formatting —
+// see decision-log entry 2026-05-01 06:50 ("Plural depth"): we don't
+// add JS just for time-zone display.
+const formatHhMmUtc = (epochMs: number): string => {
+  const d = new Date(epochMs);
+  const hh = d.getUTCHours().toString().padStart(2, "0");
+  const mm = d.getUTCMinutes().toString().padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
+const closingNoteAuthorIndex = (session: Session): number => {
+  if (session.closingNoteUpdatedBy === null) {
+    return -1;
+  }
+  const ordered = sortedParticipants(session);
+  return ordered.findIndex((p) => p.id === session.closingNoteUpdatedBy);
+};
+
 // Plain-text recap of a completed session. Pure function — used both for
 // the clipboard-copy payload on the complete view and for any future
 // take-away surface. Newlines are real `\n`, not HTML.
@@ -399,10 +470,24 @@ export const renderRecapText = (session: Session): string => {
       ? new Date(session.completedAt).toISOString()
       : new Date().toISOString();
   const footer = `Generated ${completedIso} from a Roundtable session. Roundtable does not provide financial, tax, legal, or investment advice.`;
+  const sections: Array<string> = [];
+  if (
+    session.closingNote !== "" &&
+    session.closingNoteUpdatedAt !== null
+  ) {
+    const authorIdx = closingNoteAuthorIndex(session);
+    const authorLabel =
+      authorIdx >= 0 ? labelForIndex(authorIdx) : "a participant";
+    const stamp = formatHhMmUtc(session.closingNoteUpdatedAt);
+    sections.push(
+      `Together — last saved by ${authorLabel} at ${stamp} (UTC):\n${session.closingNote}`,
+    );
+  }
+  sections.push(blocks.join("\n\n"));
   return [
     "Roundtable — conversation recap",
     "",
-    blocks.join("\n\n"),
+    sections.join("\n\n"),
     "",
     footer,
   ].join("\n");
@@ -632,6 +717,54 @@ const renderCompleteView = (session: Session): string => {
   // break out of the script tag.
   const recapText = renderRecapText(session);
   const recapLiteral = JSON.stringify(recapText).replace(/<\//g, "<\\/");
+
+  // Closing-note input section — shown to every visitor on the complete
+  // view. Pre-fills with the current shared note (HTML-escaped). No
+  // <meta refresh> on this view: that would clear the textarea exactly
+  // like the answer-view P0 we already fixed. The helper line tells the
+  // user to refresh manually.
+  let lastSavedLine: string;
+  if (
+    session.closingNoteUpdatedBy !== null &&
+    session.closingNoteUpdatedAt !== null
+  ) {
+    const authorIdx = closingNoteAuthorIndex(session);
+    const authorLabel =
+      authorIdx >= 0 ? labelForIndex(authorIdx) : "a participant";
+    const stamp = formatHhMmUtc(session.closingNoteUpdatedAt);
+    lastSavedLine = `<p class="last-saved">Last saved by ${escapeHtml(authorLabel)} at ${escapeHtml(stamp)}</p>`;
+  } else {
+    lastSavedLine = `<p class="last-saved">Nothing saved yet.</p>`;
+  }
+  const closingNoteSection = `<section class="closing-note">
+        <h2>One last thing — together.</h2>
+        <p class="helper">Is there a sentence you'd like to take away from this conversation? Anyone here can write or revise it. Refresh to see updates from the others.</p>
+        <form method="post" action="/s/${escapeHtml(session.code)}/closing-note">
+          <textarea name="text" maxlength="280" rows="2">${escapeHtml(session.closingNote)}</textarea>
+          <button class="cta" type="submit">Save this sentence</button>
+        </form>
+        ${lastSavedLine}
+      </section>`;
+
+  // Recap-closing block — the printed/clipped artefact. Only rendered
+  // when the closing note is non-empty. Distinct wrapper class so the
+  // print stylesheet keeps it visible while hiding the input section.
+  let recapClosingBlock = "";
+  if (
+    session.closingNote !== "" &&
+    session.closingNoteUpdatedAt !== null
+  ) {
+    const authorIdx = closingNoteAuthorIndex(session);
+    const authorLabel =
+      authorIdx >= 0 ? labelForIndex(authorIdx) : "a participant";
+    const stamp = formatHhMmUtc(session.closingNoteUpdatedAt);
+    recapClosingBlock = `<div class="recap-closing">
+        <h3>Together</h3>
+        <p class="body">${escapeHtml(session.closingNote)}</p>
+        <p class="last-saved">Last saved by ${escapeHtml(authorLabel)} at ${escapeHtml(stamp)}</p>
+      </div>`;
+  }
+
   return `<!doctype html>
 <html lang="en-GB">
   <head>
@@ -647,7 +780,9 @@ const renderCompleteView = (session: Session): string => {
         That's the end of the deck. Roundtable doesn't keep a record
         beyond the next 24 hours.
       </p>
+      ${closingNoteSection}
       <h2>What you talked through</h2>
+      ${recapClosingBlock}
       ${recap}
       <p class="takeaway">
         Sessions disappear after 24 hours. If you'd like to keep this
