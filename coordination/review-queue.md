@@ -253,3 +253,60 @@ The deployed answer view (host+partner both joined, prompt 1) returns HTTP 200, 
 **Out of scope (per decision-log 2026-05-01 04:20):** No JS polling. No localStorage. No Durable Objects. No WebSockets. No JSON state endpoint. No share-URL change. No copy revision. No schema change. The other two refresh tags (lines 439 and 506) are intentionally untouched.
 
 **Reviewer:** please verify (1) `apps/product/src/index.ts` has exactly two `http-equiv="refresh"` occurrences (on `renderWaitingForJoiner` and `renderWaitingForRevealView`), (2) `renderAnswerView` no longer contains one, (3) all 9 Playwright tests pass against the deployed URL, (4) the deployed answer view's HTML contains no `http-equiv="refresh"` (any session where both have joined), and (5) typing in the textarea actually persists past 6 seconds in a real browser.
+
+**Reviewer verdict:** PASS — Independent fresh-shell manual evidence against the deployed Worker `fa5b9f6e-b94f-4d97-a866-9316213f1fd6` at `https://rivals-team-alpha-product.kevin-wilson.workers.dev`:
+
+```
+$ curl -sSi -X POST -c /tmp/rt-host.txt .../sessions -o /tmp/rt-create.headers
+$ grep -iE '^(location|set-cookie):' /tmp/rt-create.headers
+location: /s/WKYSQF
+set-cookie: rt_pid=fcd21993-89c2-479e-b3ca-1fe090925e0c; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400
+
+$ curl -sSi -X POST -c /tmp/rt-partner.txt .../s/WKYSQF/join -o /tmp/rt-join.headers
+$ grep -iE '^(location|set-cookie):' /tmp/rt-join.headers
+location: /s/WKYSQF
+set-cookie: rt_pid=9cad8e16-18e3-47ef-9faf-f4a326af9bb3; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400
+
+$ curl -s -H 'Cookie: rt_pid=fcd21993-89c2-479e-b3ca-1fe090925e0c' .../s/WKYSQF -o /tmp/rt-answer.html -w 'HTTP %{http_code}\n'
+HTTP 200
+$ grep -c 'http-equiv="refresh"' /tmp/rt-answer.html
+0
+$ grep -c '<textarea' /tmp/rt-answer.html
+1
+$ grep -c 'Prompt 1 of 5' /tmp/rt-answer.html
+1
+$ grep -c 'values-enough' /tmp/rt-answer.html
+1
+```
+
+Refresh-tag count on the deployed answer view (host+partner both joined, prompt 1, host's cookie): **0**. Textarea present, prompt 1 fragment present, current-prompt id `values-enough` present.
+
+Polling preserved where required:
+- Uncookied GET `/s/WKYSQF` returns the join view with `Join this session` form: refresh-tag count **0** (correct — no input, no polling needed; the user clicks the button to advance).
+- Fresh session `/s/2BVDPP` with only the host joined (host's cookie): refresh-tag count **1** (waiting-for-joiner view), `1 of 2 here` present. Correct.
+
+Source check: `grep -n 'http-equiv="refresh"' apps/product/src/index.ts` returns exactly two occurrences — line 439 (`renderWaitingForJoiner`) and line 506 (`renderWaitingForRevealView`). Zero in `renderAnswerView` (lines 461–491). Not three. Not zero. Exactly the two the spec requires.
+
+Diff review since the previous PASS (`b9ae7c1`): `apps/product/src/index.ts` shows **1 deletion, 0 insertions** (the single `<meta http-equiv="refresh" content="5" />` line on `renderAnswerView`); `apps/product/tests/smoke.spec.ts` shows **+92 lines, 0 deletions** (the two new tests). `apps/product/wrangler.jsonc`, `apps/product/src/sessions.ts`, and `apps/product/src/prompts.ts` all unchanged. No CSS, no copy, no HTML structural change beyond the single deletion. No new routes, no schema changes, no Durable Object bindings, no JS polling, no localStorage. Decision-log 2026-05-01 04:20 option (a) implemented exactly as specified.
+
+Browser-context test verified at `apps/product/tests/smoke.spec.ts` lines 406–456: real `browser.newContext()` for both host and partner, `hostPage.goto('/')` → click "Start a session" → read share URL out of `a.share-url` → partner `page.goto(shareUrl)` → click "Join this session" → host `goto('/s/<code>')` → assert `Prompt 1 of 5` visible → `textarea.fill("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")` → `await hostPage.waitForTimeout(6000)` → `await expect(textarea).toHaveValue(typed)`. If the meta refresh creeps back in, the page navigates to itself and this assertion fires on an empty textarea. Static guard at lines 366–404: walks host + partner via request context, `expect(answerHtml).not.toContain('http-equiv="refresh"')`, with the comment `// regression guard: the answer view must not auto-refresh — it would clear the textarea`. Both shapes the spec required are present.
+
+Full Playwright suite green against the deployed URL:
+
+```
+$ PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --filter product test:e2e
+✓ POST /sessions creates a session and shows the inside view (974ms)
+✓ GET /s/<code>/join returns 303 redirect to /s/<code> (128ms)
+✓ host alone still sees the waiting view (1 of 2 here) (877ms)
+✓ a second device can join via /s/<code>/join and both see 2 of 2 (1.4s)
+✓ answer view HTML must not contain a meta refresh (regression guard) (968ms)
+✓ landing page returns 200 and shows the product name (2.0s)
+✓ partner clicks the share link in a real browser context and joins (2.5s)
+✓ typed text in the answer-view textarea survives longer than the old refresh interval (7.1s)
+✓ two participants walk the full five-prompt deck end-to-end (8.5s)
+9 passed (10.4s)
+```
+
+Previous P0 hotfix not regressed: `curl -sSi GET .../s/WKYSQF/join` returns `HTTP/2 303` with `location: /s/WKYSQF`. The GET share-link alias still works.
+
+P0 #2 fixed live; the test gap that allowed the bug to ship is closed by both a static and a real-browser-context test. Real users can now type into the textarea without losing it.
