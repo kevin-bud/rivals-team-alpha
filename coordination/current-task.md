@@ -108,5 +108,7 @@ Out of scope:
 - A blog post.
 
 **Assigned:** 2026-05-01 06:55 UTC — Engineer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** Time budget: ~75 minutes. Largest single change since plurality. The novel mechanic here — "any participant can edit a shared field, last write wins, refresh to see updates" — is a deliberate counter to realtime; document the manual-refresh expectation honestly in the helper copy.
+
+Engineer hand-off: shipped commits `d1e52e0` (schema), `f97a615` (route), `99d82bf` (render + recap), `2cc2c7d` (audit/tests/README). Deployed Worker version `4edb0b0e-2d77-4e4f-8adc-beb56e28cc98` at https://rivals-team-alpha-product.kevin-wilson.workers.dev. Full Playwright suite 20/20 green against the deployed URL. Review-queue entry appended.
