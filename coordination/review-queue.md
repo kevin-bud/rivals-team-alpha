@@ -80,3 +80,20 @@ A claim is not "shipped" until the Reviewer verifies it.
 - **MVP bar (d) "A short README at the repo root describes what the product is, who it is for, and how to use it." — FAIL.** The root `README.md` (verified at `/Users/kevinwilson/Documents/GitHub/r-and-d-days/the-rivals/rivals-team-alpha/README.md`) is still the hackathon-template README aimed at "hackathon organisers and judges". Its first line is "# Hackathon template" and it explicitly says "This README is for hackathon organisers and judges. The agents read CLAUDE.md instead." It contains no description of Roundtable, no statement of who it is for, and no instructions for using it. The Engineer updated `apps/product/README.md` (which is good and necessary) but the brief specifically requires the **repo root** README. As written, MVP bar (d) is not met, so the "MVP bar from BRIEF.md is now met" claim does not hold.
 
 Required to flip to PASS: update the repo root `README.md` to describe what Roundtable is, who it is for, and how to use it (the brief does not say it has to replace everything — adding a clear product section near the top, with a link to the deployed URL and a one-paragraph "how to use it", is enough). The deck mechanic itself does not need re-verification when that lands.
+
+---
+
+## 2026-05-01 — Root README describes Roundtable (re-claim of MVP bar)
+
+**Commit:** `81b3758`
+**Deployed URL:** https://rivals-team-alpha-product.kevin-wilson.workers.dev (unchanged — no re-deploy; nothing executable changed)
+**Previous verdict:** This entry exists solely to clear the FAIL on the entry directly above (dated 2026-05-01, commit `dbcf915`). That FAIL flagged a single bullet — MVP bar (d) from `BRIEF.md`: "A short README at the repo root describes what the product is, who it is for, and how to use it." The Reviewer noted the repo-root `README.md` was still the hackathon-template README aimed at organisers and judges, with no Roundtable description, no statement of audience, and no usage instructions. The deck mechanic itself (a/b/c) had already PASSed and is not affected here.
+**What changed:** A new `## Roundtable` section has been inserted into the repo-root `README.md` at `/Users/kevinwilson/Documents/GitHub/r-and-d-days/the-rivals/rivals-team-alpha/README.md`, immediately after the existing template intro paragraph and above `## What's in here`. The section contains:
+- One sentence framing Roundtable as a guided money conversation for households — explicitly not a budgeting tool, not a financial advisor (matches decision-log entry 2026-05-01 01:38).
+- A `### Who it is for` paragraph: two or more adults sharing finances, not in crisis, varying levels of comfort with money; tone is facilitative, not prescriptive.
+- A `### How to use it` numbered list (5 steps) walking through visit the deployed URL → Start a session → share join link → take turns answering privately → simultaneous reveal → advance through the deck of five prompts.
+- The deployed URL `https://rivals-team-alpha-product.kevin-wilson.workers.dev`.
+- A `### Privacy and the regulated-advice line` block carrying the exact disclaimer line: "Roundtable does not provide financial, tax, legal, or investment advice. Sessions are stored on Cloudflare KV for 24 hours, then deleted. We do not collect accounts, names, or emails."
+All copy is British English. The existing hackathon-template content (intro, "What's in here", "Per-team setup", "Local development", "Deploy", "Tests", "Where the agents take over", "Ground rules") is untouched. No `apps/product/` source, tests, or `apps/product/README.md` were modified. No re-deploy.
+**Claim:** **The MVP bar from BRIEF.md is now met.** Bars (a), (b), (c) were already PASSed on the previous entry; bar (d) — short repo-root README describing what the product is, who it is for, and how to use it — is now satisfied by the change in commit `81b3758`.
+**Reviewer verdict:** 

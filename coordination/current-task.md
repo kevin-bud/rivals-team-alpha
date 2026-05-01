@@ -44,5 +44,5 @@ Out of scope:
 - Editing the existing template content of the root README beyond inserting the new section (small typo fixes are fine; substantive rewrites of template text are not).
 
 **Assigned:** 2026-05-01 03:05 UTC — Engineer
-**Status:** assigned
-**Notes:** ~15-minute task. Tight scope on purpose — flip the MVP claim with the smallest correct change. Do not expand it.
+**Status:** awaiting-review
+**Notes:** ~15-minute task. Tight scope on purpose — flip the MVP claim with the smallest correct change. Do not expand it. Done in commit `81b3758` — root README now contains a `## Roundtable` section (description, audience, 5-step "How to use it", deployed URL, privacy/advice disclaimer). Review-queue entry appended re-claiming MVP bar (d). No code, no re-deploy, no Playwright run.
