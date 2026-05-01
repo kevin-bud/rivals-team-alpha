@@ -1105,3 +1105,229 @@ test("lobby view does not contain the old hardcoded 'of 2 here' copy", async ({
   await host.dispose();
   await partner.dispose();
 });
+
+// =====================================================================
+// Regulated-advice copy regression test (decision-log entry
+// 2026-05-01 06:15). Walks every reachable user-facing view, strips
+// disclaimer-marked elements, <script>...</script> blocks, and the
+// <title>...</title> content, and asserts no advice-flavoured language
+// remains. The audit document apps/product/COPY-AUDIT.md is the
+// human-readable counterpart to this test.
+// =====================================================================
+
+type ViewSample = { surface: string; html: string };
+
+const stripDisclaimerBlocks = (html: string): string =>
+  html.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b[^>]*\bdata-disclaimer\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+
+const stripScripts = (html: string): string =>
+  html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+
+const stripTitle = (html: string): string =>
+  html.replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, "");
+
+const sanitiseForCopyAudit = (html: string): string =>
+  stripTitle(stripScripts(stripDisclaimerBlocks(html)));
+
+// Patterns derived from the decision-log 2026-05-01 06:15 spec, with
+// the `\bshould\b` form tightened to prescriptive phrasings only — see
+// COPY-AUDIT.md for the rationale.
+const bannedPatterns: ReadonlyArray<{ name: string; re: RegExp }> = [
+  {
+    name: "advice-flavoured terminology",
+    re: /\b(invest(ed|ing|ment|ments)?|tax(es|ation)?|legal|recommend(s|ed|ing)?|advise[ds]?|adviser|advisor|ought to)\b/i,
+  },
+  {
+    name: "prescriptive 'should'",
+    re: /\b(you should|should we|should you|we should)\b/i,
+  },
+  {
+    name: "currency amount",
+    re: /[£$€¥]\s*\d/,
+  },
+  {
+    name: "percentage",
+    re: /\b\d+\s*%\b/,
+  },
+];
+
+const assertNoBannedTerms = (sample: ViewSample): void => {
+  const cleaned = sanitiseForCopyAudit(sample.html);
+  for (const pattern of bannedPatterns) {
+    const match = cleaned.match(pattern.re);
+    if (match !== null) {
+      throw new Error(
+        `Banned-term regression: surface "${sample.surface}" contains ` +
+          `${pattern.name} — matched "${match[0]}" at index ${match.index ?? -1}.`,
+      );
+    }
+  }
+};
+
+test("every user-facing view obeys the regulated-advice line", async ({
+  baseURL,
+}) => {
+  // Walk every reachable user-facing surface, collect the rendered
+  // HTML, strip disclaimer blocks / scripts / titles, and assert no
+  // advice-flavoured language survives. The disclaimer wording itself
+  // legitimately contains "tax", "legal", "investment", "advice"; it
+  // is wrapped in `data-disclaimer="true"` in production code (the
+  // shared <footer> and the inline landing positioning span), so the
+  // strip exempts those by element rather than by string-match.
+  const host = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const partner = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+
+  const samples: Array<ViewSample> = [];
+
+  // Surface 1: landing page.
+  const landing = await host.get("/");
+  expect(landing.status()).toBe(200);
+  samples.push({ surface: "/", html: await landing.text() });
+
+  // Surface 2: session-not-found page.
+  const notFound = await host.get("/s/NOTREAL");
+  expect(notFound.status()).toBe(404);
+  samples.push({ surface: "/s/NOTREAL", html: await notFound.text() });
+
+  // Mint a real session for the remaining surfaces.
+  const create = await host.post("/sessions", { maxRedirects: 5 });
+  expect(create.status()).toBe(200);
+  const createBody = await create.text();
+  const codeMatch = createBody.match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  // Surface 3: lobby (host alone, before partner joins).
+  samples.push({
+    surface: "lobby (host alone)",
+    html: createBody,
+  });
+
+  // Surface 4: GET /s/<code>/join — the share-link redirect target.
+  // Following maxRedirects we end up on the canonical /s/<code> view.
+  // For a fresh context that hasn't joined, this renders the join view.
+  const stranger = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const joinGet = await stranger.get(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(joinGet.status()).toBe(200);
+  samples.push({
+    surface: "GET /s/<code>/join (renderJoinView)",
+    html: await joinGet.text(),
+  });
+  await stranger.dispose();
+
+  // Surface 5: lobby (host's view after partner joins, before begin).
+  const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(join.status()).toBe(200);
+  samples.push({
+    surface: "lobby (partner just joined, host POV)",
+    html: await join.text(),
+  });
+  const lobbyAfterJoin = await host.get(`/s/${code}`);
+  expect(lobbyAfterJoin.status()).toBe(200);
+  samples.push({
+    surface: "lobby (host, after partner joined)",
+    html: await lobbyAfterJoin.text(),
+  });
+
+  // Begin the conversation so we can reach the answer / waiting /
+  // reveal / complete views.
+  const begin = await host.post(`/s/${code}/begin`, { maxRedirects: 5 });
+  expect(begin.status()).toBe(200);
+
+  // Surface 6: answer view (host, prompt 1).
+  const answerView = await host.get(`/s/${code}`);
+  expect(answerView.status()).toBe(200);
+  samples.push({
+    surface: "renderAnswerView",
+    html: await answerView.text(),
+  });
+
+  // Host submits — surface 7: waiting-for-reveal view.
+  const hostSubmit = await host.post(`/s/${code}/answer`, {
+    form: { prompt_id: prompts[0]?.id ?? "", text: "Host first answer" },
+    maxRedirects: 5,
+  });
+  expect(hostSubmit.status()).toBe(200);
+  samples.push({
+    surface: "renderWaitingForRevealView",
+    html: await hostSubmit.text(),
+  });
+
+  // Partner submits — surface 8: reveal view.
+  const partnerSubmit = await partner.post(`/s/${code}/answer`, {
+    form: { prompt_id: prompts[0]?.id ?? "", text: "Partner first answer" },
+    maxRedirects: 5,
+  });
+  expect(partnerSubmit.status()).toBe(200);
+  samples.push({
+    surface: "renderRevealView",
+    html: await partnerSubmit.text(),
+  });
+
+  // Walk to completion so we can sample the complete view. From the
+  // reveal of prompt 1, advance and submit through the rest of the
+  // deck. We don't need to sample the intermediate views — they are
+  // already covered by surfaces 6, 7 and 8 — but we do need to advance
+  // through them to reach the complete view.
+  await host.post(`/s/${code}/next`, { maxRedirects: 5 });
+  for (let i = 1; i < prompts.length; i += 1) {
+    const prompt = prompts[i];
+    if (prompt === undefined) {
+      throw new Error("missing prompt fixture");
+    }
+    await host.post(`/s/${code}/answer`, {
+      form: { prompt_id: prompt.id, text: `Host answer ${i}` },
+      maxRedirects: 5,
+    });
+    await partner.post(`/s/${code}/answer`, {
+      form: { prompt_id: prompt.id, text: `Partner answer ${i}` },
+      maxRedirects: 5,
+    });
+    await host.post(`/s/${code}/next`, { maxRedirects: 5 });
+  }
+
+  // Surface 9: complete view.
+  const complete = await host.get(`/s/${code}`);
+  expect(complete.status()).toBe(200);
+  samples.push({
+    surface: "renderCompleteView",
+    html: await complete.text(),
+  });
+
+  // Surface 10: session-full / closed page. Trying to join after
+  // begin must surface the sessionFullHtml branch.
+  const latecomer = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const lateJoin = await latecomer.post(`/s/${code}/join`, {
+    maxRedirects: 0,
+  });
+  // The status can be 409 (session full) or another non-303; either
+  // way the body is the rendered error page and must be audited.
+  if (lateJoin.status() !== 303) {
+    samples.push({
+      surface: "sessionFullHtml",
+      html: await lateJoin.text(),
+    });
+  }
+  await latecomer.dispose();
+
+  // Run the banned-term assertions across every collected sample.
+  for (const sample of samples) {
+    assertNoBannedTerms(sample);
+  }
+
+  await host.dispose();
+  await partner.dispose();
+});
