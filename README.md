@@ -8,6 +8,48 @@ the *other* team's URLs.
 This README is for hackathon organisers and judges. The agents read
 [`CLAUDE.md`](./CLAUDE.md) instead.
 
+## Roundtable
+
+Roundtable is a guided money conversation for households — a structured
+prompt-by-prompt session two people work through together, not a
+budgeting tool and not a financial advisor.
+
+Live at <https://rivals-team-alpha-product.kevin-wilson.workers.dev>.
+
+### Who it is for
+
+Two or more adults who share some or all of their finances and want to
+talk about money more deliberately than they currently do. It assumes
+the household is not in crisis: people with varying levels of comfort
+with the topic who would benefit from a bit of structure and a way to
+hear each other's first thoughts without the social cost of going
+first. The tone is facilitative, not prescriptive — Roundtable does
+not tell anyone what to do with their money.
+
+### How to use it
+
+1. Visit <https://rivals-team-alpha-product.kevin-wilson.workers.dev> on
+   your own device and click **Start a session**. You will be taken to
+   a session screen showing a six-character code and a join link.
+2. Share the join link with the other person in your household. They
+   open it on their own device and click **Join this session**. Both
+   devices then show the first prompt.
+3. For each prompt, take turns silently: each person types their answer
+   privately and clicks **Submit privately**. Neither answer is visible
+   to the other person until both have submitted.
+4. When both have submitted, both answers reveal at the same time on
+   both screens. Read them, talk about them out loud, and when you are
+   ready either person can tap **Move to the next prompt**.
+5. Work through the deck of five prompts in one sitting. After the
+   final prompt the session shows a recap of what each of you wrote and
+   then ends. Sessions are deleted after 24 hours.
+
+### Privacy and the regulated-advice line
+
+Roundtable does not provide financial, tax, legal, or investment
+advice. Sessions are stored on Cloudflare KV for 24 hours, then
+deleted. We do not collect accounts, names, or emails.
+
 ## What's in here
 
 - `apps/blog/` — Astro 6 blog deployed to Cloudflare Workers, with
