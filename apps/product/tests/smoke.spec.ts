@@ -238,6 +238,19 @@ test("two participants walk the full five-prompt deck end-to-end", async ({
     expect(hostComplete).toContain(`Partner answer for ${fixture.id}`);
   }
 
+  // Take-away affordance: clipboard-copy button, print hint, print
+  // stylesheet, and an inline <script> wired to navigator.clipboard.
+  expect(hostComplete).toContain('id="copy-recap"');
+  expect(hostComplete).toContain("Copy to clipboard");
+  expect(hostComplete.toLowerCase()).toContain("print");
+  expect(hostComplete).toContain("@media print");
+  expect(hostComplete).toContain("clipboard.writeText");
+  // The recap text payload must include the footer disclaimer so the
+  // copied artefact carries the not-advice line.
+  expect(hostComplete).toContain(
+    "Roundtable does not provide financial, tax, legal, or investment advice.",
+  );
+
   const partnerComplete = await fetchInside(partner, code);
   expect(partnerComplete).toContain("Conversation complete");
   for (const fixture of promptFixtures) {
