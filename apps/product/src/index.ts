@@ -272,7 +272,7 @@ const escapeHtml = (s: string): string =>
     return "&#39;";
   });
 
-const sharedFooter = `<footer>
+const sharedFooter = `<footer data-disclaimer="true">
       Roundtable does not provide financial, tax, legal, or investment
       advice. Sessions are stored on Cloudflare KV for 24 hours, then
       deleted. We do not collect accounts, names, or emails.
@@ -294,7 +294,7 @@ const landingHtml = `<!doctype html>
         Roundtable is a place for the people in a household to talk about
         their shared money more deliberately. It walks you through the
         topics together, keeps the conversation balanced, and captures
-        what you decide. It is not a budget tool, not an advisor — just
+        what you decide. <span data-disclaimer="true">It is not a budget tool, not an advisor</span> — just
         a structured way to have the talk you have been meaning to have.
       </p>
       <form method="post" action="/sessions">
