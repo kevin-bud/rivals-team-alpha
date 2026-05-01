@@ -54,5 +54,7 @@ Out of scope:
 - A rival check.
 
 **Assigned:** 2026-05-01 04:55 UTC — Engineer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** Time budget: ~60 minutes. This is a deliberate test-debt paydown after two P0s today. Tests are the deliverable; finding a bug counts as success — the Orchestrator handles the hotfix decision separately if you find one.
+
+**Engineer update (2026-05-01):** Six new browser-context tests added to `apps/product/tests/smoke.spec.ts` (commit `625c90d`). Suite is now 15 tests (up from 9). All 15 pass locally against `wrangler dev` (7.7s) and against the deployed URL (10.1s). **No production code changes** — only `apps/product/tests/smoke.spec.ts` was edited (six new `test()` blocks plus a small test-only helper `setUpJoinedSession`, an added `prompts` import from `../src/prompts`, and a `type Page` import). **No bug surfaced** — all six previously-uncovered surfaces are intact under real-browser conditions. Review queue entry appended. Handing back to the Orchestrator.

@@ -310,3 +310,65 @@ $ PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --
 Previous P0 hotfix not regressed: `curl -sSi GET .../s/WKYSQF/join` returns `HTTP/2 303` with `location: /s/WKYSQF`. The GET share-link alias still works.
 
 P0 #2 fixed live; the test gap that allowed the bug to ship is closed by both a static and a real-browser-context test. Real users can now type into the textarea without losing it.
+
+---
+
+## 2026-05-01 — Test-coverage sweep: six new browser-context tests
+
+**Commit:** `625c90d`
+**Deployed URL:** https://rivals-team-alpha-product.kevin-wilson.workers.dev (unchanged — no production code touched, no re-deploy)
+**Claim:** Pure additive test-debt paydown per decision-log entry 2026-05-01 04:50. The Playwright suite now has 15 tests (up from 9). All six new tests pass against `wrangler dev` locally **and** against the deployed URL. **No production code changes** — `apps/product/src/index.ts`, `apps/product/src/sessions.ts`, `apps/product/src/prompts.ts`, and `apps/product/wrangler.jsonc` are unchanged; the only edited file is `apps/product/tests/smoke.spec.ts` (and its only non-test change is one new import: `import { prompts } from "../src/prompts";` plus an additional `type Page` import from `@playwright/test`).
+
+**Surfaces now covered (one focused browser-context test each):**
+
+1. **Landing → form submission as a user** — `landing form click submits and lands on the host view`. Real `browser.newContext()`, `page.goto('/')`, click "Start a session", `page.waitForURL` against `/\/s\/[2-9A-HJ-KMNP-Z]{6}$/` (the unambiguous 6-char alphabet from the brief). Asserts the rendered code in `.code` matches the URL code, and "1 of 2 here" is visible. Distinct from the existing `request.post('/sessions')` test because it exercises form-action wiring, the 303 redirect under a real browser, cookie handling, and the rendered host view.
+
+2. **Waiting-for-joiner auto-update** — `waiting-for-joiner view auto-updates when the partner joins`. Two real `browser.newContext()` instances. Host clicks "Start a session", lands on waiting view. Partner navigates to the literal share URL and clicks "Join this session". Then on the host page, a `page.waitForFunction` (12s timeout) waits for the body to contain either `"2 of 2 here"` or `"Prompt 1 of 5"` — both are valid landed-on states once the partner joins. **No `page.reload()`** — proves the meta-refresh polling on `renderWaitingForJoiner` actually surfaces partner-state changes.
+
+3. **Waiting-for-reveal auto-transition** — `waiting-for-reveal view auto-transitions to reveal when partner submits`. Two browser contexts, both joined via the share-URL path. Host submits an answer (lands on the waiting-for-reveal view; the heading "You've submitted. Waiting for the others." is asserted visible). Partner submits. Host's page is then `page.waitForFunction`-watched for the body to contain `"Move to the next prompt"` (the reveal CTA), within 12s. Proves the meta-refresh polling on `renderWaitingForRevealView` surfaces the reveal transition.
+
+4. **Reveal labels** — `reveal view renders both answers under Participant A and B labels`. Both contexts submit distinct, recognisable strings (`hostAnswerForReveal-12345`, `partnerAnswerForReveal-67890`). Host refreshes, lands on reveal. Asserts `page.locator('text=Participant A')` count = 1 and `text=Participant B` count = 1. Locates the `.answer-card` containing each label and asserts its body carries the host/partner answer respectively (host first joiner → A, partner second → B).
+
+5. **Clipboard button** — `complete view's clipboard button copies the recap with all five prompts`. Walks the full deck (5 prompts × 2 participants × submit + advance via the host). On the complete view, calls `page.context().grantPermissions(['clipboard-read', 'clipboard-write'])` upfront, clicks `#copy-recap`, then attempts `navigator.clipboard.readText()`. **Fallback path** documented in the test: if the clipboard API rejects (headless permissions occasionally don't take), the test extracts the inline `<script>` recap literal via a regex (`/var recapText = (".+?");/s`) and `JSON.parse`s it — that is exactly the text the click-handler would copy, so verifying its contents is just as definitive. Whichever path runs, the assertions are the same: the recap must contain `"Roundtable — conversation recap"`, **all five prompt texts** (imported from `apps/product/src/prompts.ts` via the new top-of-file import), and the substring `"does not provide financial, tax, legal, or investment advice"`. Run on the deployed URL the clipboard API path succeeded — no fallback was needed for the green run, but the fallback is wired so a flaky permission grant will not cause a spurious failure.
+
+6. **Session not found under real navigation** — `session-not-found path under a real navigation has a working back link`. `page.goto('/s/NOTREAL')` — asserts the response is HTTP 404, `page.title()` (lowercased) contains `"not found"`, and "This session has ended or never existed." is visible. Then clicks the "Back to the start" link, waits for `/$/`, and asserts both the "Roundtable" h1 and the "Start a session" button are visible — proving the back link is reachable and lands on the actual landing form, not just any page.
+
+**Helper added (test-only, not exported):** `setUpJoinedSession(hostPage, partnerPage)` — encapsulates the shared landing → click → read share URL → partner goto → click "Join this session" walk used by tests 3, 4, and 5. Returns the session code. No production code change.
+
+**Did any new test reveal a bug?** **No.** All 15 tests passed on the first run against both `wrangler dev` and the deployed URL. The test-debt paydown is a clean win: every previously-uncovered user-facing surface now has a real-browser-context guard, and none of those surfaces is currently broken. The two P0s today were the third and fourth user-facing surfaces with no browser-context coverage; the remaining six were intact, just unverified. They are now verified and locked in.
+
+**What was *not* changed (per decision-log 2026-05-01 04:50 contract):**
+- No production code under `apps/product/src/`.
+- No `apps/product/wrangler.jsonc`.
+- No `apps/product/src/prompts.ts` (only imported as a value source).
+- No `apps/blog/`.
+- No `coordination/decision-log.md`.
+- No re-deploy (deploy is required only when production code changes — none did).
+
+**Build / lint / test results:**
+- `pnpm --filter product exec eslint tests/smoke.spec.ts` clean (no output).
+- `pnpm exec playwright test` against `wrangler dev` locally: **15 passed (7.7s)**.
+- `PRODUCT_URL=https://rivals-team-alpha-product.kevin-wilson.workers.dev pnpm --filter product test:e2e`: **15 passed (10.1s)**. Per-test timing on the deployed run:
+  ```
+  POST /sessions creates a session and shows the inside view (1.0s)
+  host alone still sees the waiting view (1 of 2 here) (1.1s)
+  GET /s/<code>/join returns 303 redirect to /s/<code> (129ms)
+  a second device can join via /s/<code>/join and both see 2 of 2 (1.5s)
+  landing page returns 200 and shows the product name (1.6s)
+  answer view HTML must not contain a meta refresh (regression guard) (1.0s)
+  landing form click submits and lands on the host view (408ms)
+  partner clicks the share link in a real browser context and joins (2.1s)
+  reveal view renders both answers under Participant A and B labels (1.1s)
+  complete view's clipboard button copies the recap with all five prompts (3.5s)
+  session-not-found path under a real navigation has a working back link (239ms)
+  waiting-for-joiner view auto-updates when the partner joins (5.5s)
+  waiting-for-reveal view auto-transitions to reveal when partner submits (5.9s)
+  typed text in the answer-view textarea survives longer than the old refresh interval (7.1s)
+  two participants walk the full five-prompt deck end-to-end (8.4s)
+  15 passed (10.1s)
+  ```
+- All nine pre-existing tests still green; none refactored.
+
+**Reviewer:** please verify (1) `apps/product/tests/smoke.spec.ts` has 15 `test()` blocks (was 9), (2) `apps/product/src/*.ts` and `apps/product/wrangler.jsonc` are unchanged since the previous PASS, (3) `apps/product/tests/smoke.spec.ts` imports `prompts` from `../src/prompts`, (4) all 15 tests pass against the deployed URL, and (5) the six new tests cover the surfaces named above (landing-form click, waiting-for-joiner auto-update, waiting-for-reveal auto-transition, reveal labels, clipboard recap content, and session-not-found back-link). No new bug surfaced; no follow-up hotfix needed.
+
+
