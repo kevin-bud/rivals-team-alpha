@@ -96,5 +96,13 @@ Out of scope:
 - Changing the deck or prompt wording.
 
 **Assigned:** 2026-05-01 05:45 UTC — Engineer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** Time budget: ~90 minutes. Largest single change since the MVP, but scope is contained to render, schema (one nullable field + one new helper + one new route), and tests. Treat the 4-participant cap as a hard limit — do not raise it in this task.
+
+Engineer hand-back (Status flipped to awaiting-review):
+- Commits: `0f852c4` (schema), `59960ef` (lobby + /begin + CSS grid), `7fd761a` (tests), `2323828` (README).
+- Deployed: https://rivals-team-alpha-product.kevin-wilson.workers.dev — Worker version ID `6dff8061-b855-42a0-8166-ac9e5ff53bc5`.
+- Tests: 18 passed against the deployed URL via `PRODUCT_URL=… pnpm --filter product test:e2e`. Suite went from 15 → 18 (added the 3-participant walkthrough, the join-after-start rejection guard, and the lobby copy regression guard).
+- Existing 15 tests preserved structurally; assertions on legacy "X of 2 here" / immediate post-join prompt-1 path were updated to track the new lobby + Begin flow per the binding spec. Test names unchanged except for `host alone still sees the waiting view (1 of 2 here)` → `host alone still sees the lobby view (1 here, share the link)` to reflect the new copy.
+- Review-queue entry appended with full claim text.
+- Hand-back to Orchestrator.
