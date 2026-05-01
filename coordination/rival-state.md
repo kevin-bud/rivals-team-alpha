@@ -43,3 +43,25 @@ The rival has converged with us on the framing (guided household money conversat
 - **Cadence: don't react to their post count.** They have three posts, we have one combined post (and the launch post is queued). The brief evaluates the decision trail, not volume. Quality over count.
 
 **Next task implication:** the next Engineer task should be small and add the in-browser take-away affordance (option A above as a baseline, optionally B as a tiny add-on). This is the lowest-cost, on-strategy response to the only material gap the rival check exposed. Will be decided in the decision log before assignment.
+
+---
+
+## 2026-05-01 04:15 — Second rival check (post-hotfix milestone)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** Still "Common Ground", same one-device positioning, same six-prompts framing, same PDF-summary take-away. One small copy change since the previous check: the disclaimer block has expanded to include "does not tell you what to do with your money" alongside the existing "does not provide financial, tax, legal, or investment advice." Otherwise unchanged on the landing page. We did not deep-fetch `/session` again — the change of substance is on the blog, not the landing copy.
+
+**Recent posts:** Five on their feed now, two new since the last check (03:15):
+1. *Introducing Common Ground* (Fri 01 May 2026) — unchanged.
+2. *The session now runs end to end* (Fri 01 May 2026) — **new**: they have a working MVP. Six prompts, "a saveable summary, and a privacy claim we can now demonstrate." Roughly the equivalent of our MVP launch post.
+3. *Why one device, one session* (Fri 01 May 2026) — unchanged.
+4. *Worth coming back to* (Fri 01 May 2026) — **new**: they have added a reflection step between the final prompt and the summary. A "let it sit before you save" beat in the flow.
+5. *Project under way* (Wed 29 Apr 2026) — unchanged.
+
+**Implications:**
+
+- **MVP parity confirmed.** Both teams have a working session end-to-end. Their bet (one device, six prompts, PDF summary) and ours (two devices, five prompts, simultaneous reveal, clipboard + print) are now both expressed in shipped code. This is the moment the brief's "where did you and the rival diverge" question is most legible — the divergence is now in two products, not two intentions.
+- **Their "reflection step" is interesting but not for us to copy.** A pause between the last prompt and the recap is a fine UX choice in their single-device flow — it gives the user a beat to slow down before committing to a saved artefact. In our flow the simultaneous-reveal already enforces a pause-and-discuss beat at every prompt; adding another reflection step before the recap would be redundant. Holding our shape.
+- **Their expanded disclaimer ("does not tell you what to do with your money") is plain-English and tonally good.** Worth considering as a copy revision to our footer, but not urgent. Our disclaimer is already on-line; theirs is just slightly warmer. Not a priority.
+- **No change to our priorities from this check.** Take-away affordance has now shipped (PASS at 03:50) and the P0 routing hotfix has shipped (PASS at 04:10). Both PASSes have posts queued. The next material question is the operator's *new* user-feedback report — see decision-log entry that follows this. The rival check did not surface anything that should preempt the P0.

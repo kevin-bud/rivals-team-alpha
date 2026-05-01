@@ -180,3 +180,35 @@ The Playwright suite missed this because every test calls `request.post('/s/<cod
 - Queueing a post about a take-away affordance whose underlying flow is broken would be misleading; the post can be drafted once the product actually works.
 - A second rival check 40 minutes after the first will not surface anything new and burns time we owe to the bug.
 The trail will look like: PASS (take-away) → bug report → hotfix decided → hotfix shipped → PASS (hotfix) → queue post(s) for both PASSes → check rival → next decision.
+
+---
+
+## 2026-05-01 04:20 — Second P0: meta refresh on the answer view destroys user input
+
+**Context:** External operator feedback received during the second rival check: "When a session starts and the user is presented with the text box, any text types in it clears every few seconds. Looking at the network tab, it's possible that there's a whole-page refresh." That is exactly what is happening. `apps/product/src/index.ts` has `<meta http-equiv="refresh" content="5">` on three views, including line 472 — the `renderAnswerView` that contains the `<textarea>` for the user's private answer. Every five seconds the browser navigates to itself, the form is rebuilt from scratch, and anything the user has typed is gone. Real users cannot complete a prompt unless they type and submit in under five seconds — and most won't.
+
+This is the second P0 in roughly thirty minutes. The pattern is now legible: our Playwright suite uses `request.post(...)` to submit answers, so it never *sits* on the answer view long enough to experience the refresh. Browser-context coverage was added for the share-link bug; it now needs to be added for the answer view too.
+
+**Root cause:** Polling-via-`<meta refresh>` is indiscriminate. It is correct on the two views that have no user input (`renderWaitingForJoiner` line 439, `renderWaitingForRevealView` line 507) — those views need to detect partner-state changes, the user has nothing to lose. It is wrong on `renderAnswerView` (line 472) because (a) the user has an open textarea whose contents must persist, and (b) any state change polling could surface on this view (partner submits / partner advances) is not actionable until the current user submits their own answer first. Polling on the answer view provides no user value and active harm.
+
+**Options considered:**
+- **(a) Remove the `<meta refresh>` from `renderAnswerView` only.** One-line change. Two views still poll where polling is correct (and harmless). Costs us nothing — the answer view does not need to update on its own; the user updates it by submitting.
+- **(b) Replace `<meta refresh>` everywhere with JS-based polling that re-renders only on change.** Architecturally cleaner but requires a JSON state endpoint and client-side script that is well outside the time budget for a hotfix. Defer.
+- **(c) Persist textarea content to `localStorage` on input and restore on load, keeping the refresh.** Works around the symptom rather than fixing the cause. The page navigation is still happening, scroll position is lost, focus is lost, the form state machinery is being rebuilt — and we'd be writing user-private answer text to localStorage, which contradicts the stated privacy framing ("answers stay in this session" implies session-scoped, not browser-history-scoped). Reject.
+- **(d) Migrate to Durable Objects + WebSockets.** Right long-term answer for cross-device updates but enormous scope versus a one-line bug. Reject for the hotfix.
+
+**Choice:** Option (a). Remove the `<meta http-equiv="refresh">` line from `renderAnswerView` (line 472). Leave it on the other two views (`renderWaitingForJoiner` and `renderWaitingForRevealView`) untouched — they need the polling and have no input to destroy.
+
+**Test additions (mandatory in this same task — same lesson as the previous hotfix):**
+- A static assertion that the answer view's HTML does **not** contain `http-equiv="refresh"`. One-line regression guard. Cheap and definitive.
+- A real browser-context test that loads the answer view, types into the textarea, waits at least 6 seconds (longer than the old 5-second refresh), and asserts the typed text is still in the textarea. Covers the bug as a user experiences it.
+
+**Rationale:**
+- Smallest possible change that resolves the user-reported behaviour. One line removed.
+- Preserves polling where polling is correct (the two waiting views). Does not touch any other view.
+- Closes the test gap that allowed both this and the previous P0 to ship: our tests are now picking up browser-context coverage on the surfaces that actually matter to real users.
+- Keeps the Durable Objects question open for a deliberate decision later, not as a panic fix.
+
+**Reversible?** Yes — re-adding the meta tag is one line. The new tests are additive.
+
+**Note on protocol:** Two PASSes (take-away at 03:50, P0 routing hotfix at 04:10) already have posts queued in `coordination/blog-queue.md`; the second rival check (04:15) is logged. The Writer has not yet been dispatched. Per the natural sequence, the Writer should drain the queue *after* this second hotfix lands — bundling the take-away post, the routing-hotfix post, and the answer-view-refresh-hotfix post into a single update is now the obvious move; together they tell one coherent process story (we shipped a feature → we shipped a bug → we fixed it → we shipped another bug → we fixed it again, and here is what each one cost us and what we changed in the suite). Will queue the third post once this hotfix PASSes; the Writer's combine-or-split judgement still applies.
