@@ -67,7 +67,7 @@ test("POST /sessions creates a session and shows the inside view", async ({
 
   const match = body.match(codePattern);
   expect(match, "expected a 6-character join code in the body").not.toBeNull();
-  expect(body).toContain("1 of 2 here");
+  expect(body).toContain("1 here. Share the link with the others.");
 
   await ctx.dispose();
 });
@@ -95,22 +95,25 @@ test("a second device can join via /s/<code>/join and both see 2 of 2", async ({
   const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
   expect(join.status()).toBe(200);
   const partnerBody = await join.text();
-  // With the second participant present the deck is unlocked, so the
-  // landed-on view is the answer view for prompt 1, not the waiting
-  // view. The first-prompt fragment proves the join took.
-  expect(partnerBody).toContain("Prompt 1 of 5");
-  expect(partnerBody).toContain('prompt_id" value="values-enough"');
+  // Both still sit in the lobby — the host has not pressed Begin yet,
+  // so the deck is locked. Partner sees "2 here." and the
+  // waiting-for-host action block.
+  expect(partnerBody).toContain("2 here.");
+  expect(partnerBody).toContain("Waiting for the host to begin");
 
-  // Host refreshes — should also now see the answer view.
+  // Host refreshes — should also still be in the lobby with the Begin
+  // form available now that two are in.
   const hostRefresh = await host.get(`/s/${code}`);
   expect(hostRefresh.status()).toBe(200);
-  expect(await hostRefresh.text()).toContain("Prompt 1 of 5");
+  const hostBody2 = await hostRefresh.text();
+  expect(hostBody2).toContain("2 here.");
+  expect(hostBody2).toContain("Begin the conversation");
 
   await host.dispose();
   await partner.dispose();
 });
 
-test("host alone still sees the waiting view (1 of 2 here)", async ({
+test("host alone still sees the lobby view (1 here, share the link)", async ({
   baseURL,
 }) => {
   const host = await playwrightRequest.newContext({
@@ -120,7 +123,9 @@ test("host alone still sees the waiting view (1 of 2 here)", async ({
   const create = await host.post("/sessions", { maxRedirects: 5 });
   expect(create.status()).toBe(200);
   const body = await create.text();
-  expect(body).toContain("1 of 2 here");
+  expect(body).toContain("1 here. Share the link with the others.");
+  // Host alone should not yet see the Begin form — needs at least two.
+  expect(body).not.toContain("Begin the conversation");
   await host.dispose();
 });
 
@@ -167,9 +172,11 @@ test("partner clicks the share link in a real browser context and joins", async 
   await hostPage.goto("/");
   await hostPage.getByRole("button", { name: "Start a session" }).click();
 
-  // Host should now be on the inside view, with the share URL rendered
-  // as a clickable anchor.
-  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  // Host should now be on the inside view (lobby), with the share URL
+  // rendered as a clickable anchor.
+  await expect(
+    hostPage.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
   const shareLink = hostPage.locator("a.share-url");
   await expect(shareLink).toBeVisible();
   const shareUrl = await shareLink.getAttribute("href");
@@ -217,16 +224,11 @@ test("partner clicks the share link in a real browser context and joins", async 
   await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
 
   const partnerBody = await partnerPage.content();
-  // Either "2 of 2 here" (waiting view briefly) or the prompt-1 answer
-  // view — both are valid landed-on states once the partner has joined.
-  // The decisive thing is that we are not on the join view nor the 404.
+  // Partner lands in the lobby with "2 here." and the waiting-for-host
+  // action block. The deck does not unlock until the host begins.
   expect(partnerBody).not.toContain("Session not found");
-  const showsBoth = partnerBody.includes("2 of 2 here");
-  const showsPrompt = partnerBody.includes("Prompt 1 of 5");
-  expect(
-    showsBoth || showsPrompt,
-    'partner must see either "2 of 2 here" or the first prompt after joining',
-  ).toBe(true);
+  expect(partnerBody).toContain("2 here.");
+  expect(partnerBody).toContain("Waiting for the host to begin");
 
   await hostContext.close();
   await partnerContext.close();
@@ -276,9 +278,12 @@ test("two participants walk the full five-prompt deck end-to-end", async ({
   const code = codeMatch ? codeMatch[0] : "";
   expect(code).not.toBe("");
 
-  // Partner joins so the deck is unlocked.
+  // Partner joins; the host then begins the conversation. Until the
+  // host taps Begin the deck stays locked behind the lobby.
   const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
   expect(join.status()).toBe(200);
+  const begin = await host.post(`/s/${code}/begin`, { maxRedirects: 5 });
+  expect(begin.status()).toBe(200);
 
   // Walk all five prompts.
   for (let i = 0; i < promptFixtures.length; i += 1) {
@@ -389,10 +394,12 @@ test("answer view HTML must not contain a meta refresh (regression guard)", asyn
   const code = codeMatch ? codeMatch[0] : "";
   expect(code).not.toBe("");
 
-  // Partner joins so the deck is unlocked and the host's GET /s/<code>
-  // lands on the answer view rather than the waiting-for-joiner view.
+  // Partner joins, host begins; with the deck unlocked the host's
+  // GET /s/<code> now lands on the answer view rather than the lobby.
   const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
   expect(join.status()).toBe(200);
+  const begin = await host.post(`/s/${code}/begin`, { maxRedirects: 5 });
+  expect(begin.status()).toBe(200);
 
   const answerHtml = await fetchInside(host, code);
   // We are on the answer view for prompt 1.
@@ -417,8 +424,10 @@ test("typed text in the answer-view textarea survives longer than the old refres
   await hostPage.goto("/");
   await hostPage.getByRole("button", { name: "Start a session" }).click();
 
-  // Host is on the waiting-for-joiner view; pull the share URL.
-  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  // Host is on the lobby; pull the share URL.
+  await expect(
+    hostPage.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
   const shareLink = hostPage.locator("a.share-url");
   const shareUrl = await shareLink.getAttribute("href");
   expect(shareUrl, "host page must render a share URL").not.toBeNull();
@@ -434,9 +443,14 @@ test("typed text in the answer-view textarea survives longer than the old refres
   await partnerPage.getByRole("button", { name: "Join this session" }).click();
   await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
 
-  // Host navigates to the inside view; with the partner present, this
-  // is the answer view for prompt 1.
+  // Host taps Begin so the deck unlocks.
   await hostPage.goto(`/s/${code}`);
+  await hostPage
+    .getByRole("button", { name: "Begin the conversation" })
+    .click();
+  await hostPage.waitForURL(new RegExp(`/s/${code}$`));
+
+  // Host is now on the answer view for prompt 1.
   await expect(hostPage.getByText("Prompt 1 of 5")).toBeVisible();
   const textarea = hostPage.locator('textarea[name="text"]');
   await expect(textarea).toBeVisible();
@@ -478,7 +492,9 @@ const setUpJoinedSession = async (
 ): Promise<string> => {
   await hostPage.goto("/");
   await hostPage.getByRole("button", { name: "Start a session" }).click();
-  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  await expect(
+    hostPage.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
   const shareLink = hostPage.locator("a.share-url");
   const shareUrl = await shareLink.getAttribute("href");
   expect(shareUrl, "host page must render a share URL").not.toBeNull();
@@ -490,6 +506,14 @@ const setUpJoinedSession = async (
   await partnerPage.goto(shareUrl ?? `/s/${code}/join`);
   await partnerPage.getByRole("button", { name: "Join this session" }).click();
   await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
+
+  // Host taps Begin so the deck unlocks. Until then both are stuck in
+  // the lobby, regardless of count.
+  await hostPage.goto(`/s/${code}`);
+  await hostPage
+    .getByRole("button", { name: "Begin the conversation" })
+    .click();
+  await hostPage.waitForURL(new RegExp(`/s/${code}$`));
 
   return code;
 };
@@ -517,7 +541,9 @@ test("landing form click submits and lands on the host view", async ({
   await expect(page.locator(".code")).toHaveText(code);
 
   // And the count copy must be visible.
-  await expect(page.getByText("1 of 2 here")).toBeVisible();
+  await expect(
+    page.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
 
   await context.close();
 });
@@ -534,7 +560,9 @@ test("waiting-for-joiner view auto-updates when the partner joins", async ({
   const hostPage = await hostContext.newPage();
   await hostPage.goto("/");
   await hostPage.getByRole("button", { name: "Start a session" }).click();
-  await expect(hostPage.getByText("1 of 2 here")).toBeVisible();
+  await expect(
+    hostPage.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
 
   const shareLink = hostPage.locator("a.share-url");
   const shareUrl = await shareLink.getAttribute("href");
@@ -552,15 +580,16 @@ test("waiting-for-joiner view auto-updates when the partner joins", async ({
   await partnerPage.waitForURL(new RegExp(`/s/${code}$`));
 
   // Host's page must update on its own. The meta-refresh interval is
-  // 5s; 10s comfortably allows for one cycle plus KV propagation.
-  // After the partner joins, the deck unlocks, so the host could land
-  // on either "2 of 2 here" (if rendering still shows the waiting view
-  // briefly) or directly on the prompt-1 answer view. Either is a
-  // valid sign that the auto-update worked.
+  // 5s; 12s comfortably allows for one cycle plus KV propagation.
+  // After the partner joins, the lobby flips to "2 here." and the
+  // host now sees the Begin form. The deck does not auto-unlock.
   await hostPage.waitForFunction(
     () => {
       const text = document.body.textContent ?? "";
-      return text.includes("2 of 2 here") || text.includes("Prompt 1 of 5");
+      return (
+        text.includes("2 here.") &&
+        text.includes("Begin the conversation")
+      );
     },
     null,
     { timeout: 12000 },
@@ -826,4 +855,253 @@ test("session-not-found path under a real navigation has a working back link", a
   ).toBeVisible();
 
   await context.close();
+});
+
+// =====================================================================
+// Plurality (decision-log entry 2026-05-01 05:40 — "Next product axis:
+// plurality, not breadth"). Three new tests: a three-participant
+// walkthrough through prompts 1–2, a regression guard that the lobby
+// copy no longer contains the old "of 2 here", and a guard that
+// joinSession refuses new joiners after the host has begun.
+// =====================================================================
+
+test("three participants share a session, walk prompts 1 and 2, see A/B/C labels", async ({
+  browser,
+}) => {
+  // Three real browser contexts. Host starts a session, two partners
+  // join via the share URL, host taps Begin once everyone is in. For
+  // prompts 1 and 2 each of the three submits a distinct, recognisable
+  // answer; the host's reveal view must show "Participant A",
+  // "Participant B", and "Participant C" once each, with the right
+  // typed answer beside each. Two prompts is enough to confirm
+  // 3-participant correctness — no need to walk the full five.
+  const hostContext = await browser.newContext();
+  const hostPage = await hostContext.newPage();
+  const partnerOneContext = await browser.newContext();
+  const partnerOnePage = await partnerOneContext.newPage();
+  const partnerTwoContext = await browser.newContext();
+  const partnerTwoPage = await partnerTwoContext.newPage();
+
+  // Host starts a session and waits in the lobby.
+  await hostPage.goto("/");
+  await hostPage.getByRole("button", { name: "Start a session" }).click();
+  await expect(
+    hostPage.getByText("1 here. Share the link with the others."),
+  ).toBeVisible();
+  const shareLink = hostPage.locator("a.share-url");
+  const shareUrl = await shareLink.getAttribute("href");
+  expect(shareUrl, "host page must render a share URL").not.toBeNull();
+  const codeMatch = (shareUrl ?? "").match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  // Partner 1 joins via the share URL. Lobby should show "2 here" and
+  // partner 1 sees their positional label "You are Participant B".
+  await partnerOnePage.goto(shareUrl ?? `/s/${code}/join`);
+  await partnerOnePage
+    .getByRole("button", { name: "Join this session" })
+    .click();
+  await partnerOnePage.waitForURL(new RegExp(`/s/${code}$`));
+  await expect(partnerOnePage.getByText("2 here.")).toBeVisible();
+  await expect(
+    partnerOnePage.getByText("You are Participant B."),
+  ).toBeVisible();
+
+  // Host refreshes — they should see "2 here" and the Begin form.
+  await hostPage.goto(`/s/${code}`);
+  await expect(hostPage.getByText("2 here.")).toBeVisible();
+  await expect(
+    hostPage.getByText("You are Participant A."),
+  ).toBeVisible();
+  await expect(
+    hostPage.getByRole("button", { name: "Begin the conversation" }),
+  ).toBeVisible();
+
+  // Partner 2 joins. Lobby should show "3 here". Host has not yet
+  // tapped Begin, so the Begin form is still on the host's page.
+  await partnerTwoPage.goto(shareUrl ?? `/s/${code}/join`);
+  await partnerTwoPage
+    .getByRole("button", { name: "Join this session" })
+    .click();
+  await partnerTwoPage.waitForURL(new RegExp(`/s/${code}$`));
+  await expect(partnerTwoPage.getByText("3 here.")).toBeVisible();
+  await expect(
+    partnerTwoPage.getByText("You are Participant C."),
+  ).toBeVisible();
+
+  await hostPage.goto(`/s/${code}`);
+  await expect(hostPage.getByText("3 here.")).toBeVisible();
+  await expect(
+    hostPage.getByRole("button", { name: "Begin the conversation" }),
+  ).toBeVisible();
+
+  // Host clicks Begin. All three pages should now show prompt 1.
+  await hostPage
+    .getByRole("button", { name: "Begin the conversation" })
+    .click();
+  await hostPage.waitForURL(new RegExp(`/s/${code}$`));
+  await expect(hostPage.getByText("Prompt 1 of 5")).toBeVisible();
+
+  await partnerOnePage.goto(`/s/${code}`);
+  await expect(partnerOnePage.getByText("Prompt 1 of 5")).toBeVisible();
+  await partnerTwoPage.goto(`/s/${code}`);
+  await expect(partnerTwoPage.getByText("Prompt 1 of 5")).toBeVisible();
+
+  // Walk prompts 1 and 2.
+  for (let i = 0; i < 2; i += 1) {
+    const promptNumber = i + 1;
+    const hostAnswer = `host-answer-prompt-${promptNumber}`;
+    const partnerOneAnswer = `partner-one-answer-prompt-${promptNumber}`;
+    const partnerTwoAnswer = `partner-two-answer-prompt-${promptNumber}`;
+
+    // Each submits in turn from a fresh GET so the meta-refresh state
+    // is irrelevant to the assertion path.
+    await hostPage.goto(`/s/${code}`);
+    await expect(
+      hostPage.getByText(`Prompt ${promptNumber} of 5`),
+    ).toBeVisible();
+    await hostPage.locator('textarea[name="text"]').fill(hostAnswer);
+    await hostPage
+      .getByRole("button", { name: "Submit privately" })
+      .click();
+
+    await partnerOnePage.goto(`/s/${code}`);
+    await expect(
+      partnerOnePage.getByText(`Prompt ${promptNumber} of 5`),
+    ).toBeVisible();
+    await partnerOnePage
+      .locator('textarea[name="text"]')
+      .fill(partnerOneAnswer);
+    await partnerOnePage
+      .getByRole("button", { name: "Submit privately" })
+      .click();
+
+    await partnerTwoPage.goto(`/s/${code}`);
+    await expect(
+      partnerTwoPage.getByText(`Prompt ${promptNumber} of 5`),
+    ).toBeVisible();
+    await partnerTwoPage
+      .locator('textarea[name="text"]')
+      .fill(partnerTwoAnswer);
+    await partnerTwoPage
+      .getByRole("button", { name: "Submit privately" })
+      .click();
+
+    // Host refreshes onto the reveal view.
+    await hostPage.goto(`/s/${code}`);
+    await expect(hostPage.getByText("Both answers")).toBeVisible();
+
+    // Each label appears exactly once on the reveal.
+    await expect(hostPage.locator("text=Participant A")).toHaveCount(1);
+    await expect(hostPage.locator("text=Participant B")).toHaveCount(1);
+    await expect(hostPage.locator("text=Participant C")).toHaveCount(1);
+
+    // The card carrying each label carries the matching answer.
+    await expect(
+      hostPage.locator(".answer-card").filter({ hasText: "Participant A" }),
+    ).toContainText(hostAnswer);
+    await expect(
+      hostPage.locator(".answer-card").filter({ hasText: "Participant B" }),
+    ).toContainText(partnerOneAnswer);
+    await expect(
+      hostPage.locator(".answer-card").filter({ hasText: "Participant C" }),
+    ).toContainText(partnerTwoAnswer);
+
+    // Host advances.
+    await hostPage
+      .getByRole("button", { name: "Move to the next prompt" })
+      .click();
+  }
+
+  await hostContext.close();
+  await partnerOneContext.close();
+  await partnerTwoContext.close();
+});
+
+test("a fourth person trying to join after the host begins is rejected", async ({
+  baseURL,
+}) => {
+  // Once the host has begun the conversation the room closes. A new
+  // POST /s/<code>/join must not produce a 303 redirect to the inside
+  // view — it must surface the session-full / closed error page (or
+  // otherwise refuse with a non-303 status).
+  const host = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const partner = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const latecomer = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+
+  const create = await host.post("/sessions", { maxRedirects: 5 });
+  expect(create.status()).toBe(200);
+  const codeMatch = (await create.text()).match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(join.status()).toBe(200);
+
+  const begin = await host.post(`/s/${code}/begin`, { maxRedirects: 0 });
+  expect(begin.status()).toBe(303);
+  expect(begin.headers()["location"]).toBe(`/s/${code}`);
+
+  // Latecomer tries to join after Begin. The route should not 303 to
+  // the inside view; it should surface the session-full / closed page.
+  const latePost = await latecomer.post(`/s/${code}/join`, {
+    maxRedirects: 0,
+  });
+  expect(latePost.status()).not.toBe(303);
+  // 409 is what the existing `sessionFullHtml` branch returns.
+  expect([400, 404, 409]).toContain(latePost.status());
+
+  await host.dispose();
+  await partner.dispose();
+  await latecomer.dispose();
+});
+
+test("lobby view does not contain the old hardcoded 'of 2 here' copy", async ({
+  baseURL,
+}) => {
+  // Regression guard against the pre-plurality "1 of 2 here" /
+  // "X of 2 here" copy slipping back into the lobby. We mint a fresh
+  // session (host alone) and a second-participant lobby state, and
+  // assert the literal substring "of 2 here" is absent from both.
+  const host = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const partner = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+
+  const create = await host.post("/sessions", { maxRedirects: 5 });
+  expect(create.status()).toBe(200);
+  const hostBody = await create.text();
+  const codeMatch = hostBody.match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+  expect(hostBody).not.toContain("of 2 here");
+
+  const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(join.status()).toBe(200);
+  const partnerBody = await join.text();
+  expect(partnerBody).not.toContain("of 2 here");
+
+  // Host's refreshed lobby must also be clean.
+  const hostRefresh = await host.get(`/s/${code}`);
+  expect(hostRefresh.status()).toBe(200);
+  expect(await hostRefresh.text()).not.toContain("of 2 here");
+
+  await host.dispose();
+  await partner.dispose();
 });
