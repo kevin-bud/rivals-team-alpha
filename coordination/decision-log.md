@@ -122,3 +122,26 @@ new entry that references the previous one.
 **Rationale:** Hard-coding gives us total control over the regulated-advice line, which is the fastest way to be confident every prompt is safe. Five prompts is enough to feel like a session without overstaying the first sitting. The five chosen span values, history, recent behaviour, present arrangements, and hypothetical stress — a deliberate range so the conversation does not collapse to one topic. The IDs (not just indices) are deliberate so a future "skip" or "shuffle" feature does not break stored answers.
 
 **Reversible?** Fully reversible — wording can be revised, prompts added or replaced. The shape (ordered array of `{ id, text }`) is the load-bearing contract; revising copy is a one-commit change. If we add a "shuffle" or "user-selectable deck" feature later, the IDs survive.
+
+---
+
+## 2026-05-01 03:30 — Take-away affordance: clipboard copy + print stylesheet, no new storage
+
+**Context:** First post-MVP rival check (rival-state entry 2026-05-01 03:15) shows the rival's product, "Common Ground", offers a "shared summary you can save as a PDF" at the end of a session. Our complete view already renders the full recap (5 prompts × 2 answers) in-browser, but we offer no affordance for participants to keep it. This is the only material product-experience gap the rival check exposed and worth closing on our terms before any other feature work.
+
+**Options considered:**
+- **(a) Server-side PDF generation.** Match the rival like-for-like. Rejected: requires storing the rendered output even briefly (or running a PDF library in a Worker), which complicates the privacy story. We chose ephemerality and no-accounts; introducing PDF generation pulls against both.
+- **(b) Email-the-summary-to-yourself.** Rejected outright: the footer says "we do not collect accounts, names, or emails", and breaking that for a take-away feature would be the kind of own-goal the brief explicitly evaluates badly.
+- **(c) "Copy this conversation" clipboard button on the complete view.** Tiny client-side JS, copies a plain-text version of the recap (prompt + Participant A's answer + Participant B's answer, repeated for each prompt). Zero new storage, zero new dependencies. Works on every modern browser via `navigator.clipboard.writeText`.
+- **(d) Print-friendly stylesheet (`@media print`).** Hide the chrome (refresh meta, "advance" form, etc.) so the participant can browser-print the complete view to PDF *on their own device*. This is the rival's PDF feature implemented as user-agent capability rather than as a server feature — same outcome, our privacy posture intact.
+- **(e) `?download` query that returns recap as a `text/plain` attachment.** Functionally redundant with (c) once (c) exists; nicer for users without clipboard JS but adds a route surface for very little extra utility. Defer.
+
+**Choice:** Ship (c) and (d) together as the next Engineer task. Defer (e); revisit only if we see evidence users want it. (a) and (b) are off the table on principle, not on cost.
+
+**Rationale:**
+- Closes the take-away gap with zero compromise to the ephemeral-by-default privacy story. Both (c) and (d) operate on data already rendered in the user's browser; nothing new is stored, sent, or generated server-side.
+- The combined effort is small (a button + a small `<script>` + a `@media print` block) and isolated to the complete view's render path — no schema changes, no new routes, no test infrastructure changes.
+- Differentiates *intentionally* from the rival: their take-away is a server-rendered PDF, ours is "your browser already has everything; here are two buttons to keep it on your own device." That difference is itself a design statement consistent with our privacy framing.
+- Holds the line on the "no accounts, no emails, no PII off-device after 24 hours" promise. The rival check tempted us toward expanding scope; we are responding *narrowly*.
+
+**Reversible?** Yes, trivially. Removing either feature is a single commit and breaks no contract.
