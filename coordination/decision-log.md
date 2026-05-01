@@ -91,3 +91,34 @@ new entry that references the previous one.
 **Rationale:** KV is the lowest-friction store that satisfies the multi-user requirement, gives us TTL-based privacy out of the box (data deletes itself), and avoids the schema overhead of D1 for state that is intentionally ephemeral. KV's eventual consistency is acceptable for the deck-of-prompts pattern: a partner refreshing twice to see the other's submission is fine; we do not need sub-second realtime for MVP. If realtime becomes load-bearing, we migrate the *active session* into a Durable Object behind the same routes — Engineer should keep the storage interface narrow enough that this swap is mechanical.
 
 **Reversible?** Yes, but with migration cost — any in-flight sessions at the time of swap would be discarded (acceptable given TTL). Storage interface should be wrapped so the swap touches one module.
+
+---
+
+## 2026-05-01 02:35 — MVP prompt deck: five open prompts, authored by us, hard-coded
+
+**Context:** Session join handshake shipped and PASSed. The next step is the core mechanic — a prompt, two private answers, simultaneous reveal, advance. The prompts themselves are identity-defining content and on the regulated-advice line, so the wording is an Orchestrator decision, not an Engineer one.
+
+**Options considered:**
+- **(a) LLM-generated prompts at runtime.** Maximum variety per session. Rejected: an LLM generating money prompts at runtime is one error-handling bug away from generating *advice* in the prompt itself, which is the failure condition. Also adds an API dependency for MVP.
+- **(b) Source from a published card deck (e.g. *36 Questions*–style adaptations).** Saves authoring effort but introduces licensing/attribution overhead and weakens the team's decision trail (we want the brief's evaluators to see *our* choices, not someone else's).
+- **(c) Author a small fixed deck ourselves, hard-coded as a TypeScript array.** Five prompts for MVP. We control every word. Easy to extend later. No runtime cost.
+- **Length: 3 vs 5 vs 10 prompts.** Three feels too short for a "session". Ten risks fatigue in a first sitting. Five is roughly twenty minutes of conversation at a relaxed pace, which matches "a single sitting" in the brief.
+
+**Choice:** Option (c). Five prompts, hard-coded in `apps/product/src/prompts.ts` as a named export `prompts: ReadonlyArray<{ id: string; text: string }>`. Exact wording, in order:
+
+1. **`values-enough`** — "What does 'enough' mean to each of us, in three years' time?"
+2. **`history-belief`** — "What's something about money you grew up believing that you've since changed your mind about — or are starting to?"
+3. **`recent-decision`** — "Think of a money decision we (or you) made in the last year. What feels good about it now? What feels less good?"
+4. **`shared-costs`** — "When it comes to how we split or share costs at the moment, what feels fair to you, and what doesn't?"
+5. **`unexpected`** — "If something unexpected happened that felt financially significant — whatever 'significant' means to us — what's the first thing each of us would worry about?"
+
+**Rules the prompts obey (so future additions stay on-line):**
+- Open-ended. No yes/no, no multiple-choice.
+- Ask about *feelings, values, perspectives, or lived experience* — never about what someone *should* do.
+- No specific monetary amounts, percentages, products, or tax/legal/investment terminology.
+- Phrased as a shared "we" or symmetrical "each of us" where natural — never as a question one partner asks the other.
+- British English.
+
+**Rationale:** Hard-coding gives us total control over the regulated-advice line, which is the fastest way to be confident every prompt is safe. Five prompts is enough to feel like a session without overstaying the first sitting. The five chosen span values, history, recent behaviour, present arrangements, and hypothetical stress — a deliberate range so the conversation does not collapse to one topic. The IDs (not just indices) are deliberate so a future "skip" or "shuffle" feature does not break stored answers.
+
+**Reversible?** Fully reversible — wording can be revised, prompts added or replaced. The shape (ordered array of `{ id, text }`) is the load-bearing contract; revising copy is a one-commit change. If we add a "shuffle" or "user-selectable deck" feature later, the IDs survive.
