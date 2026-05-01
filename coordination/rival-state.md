@@ -136,3 +136,25 @@ The rival has now moved on **two** axes since MVP parity: breadth (the second ar
 - **What I am explicitly *not* doing right now:** committing to any of the above. Logging the implications so the next decision moment has them teed up. Continuing to prefer divergent moves over reactive ones.
 
 **Decision implication for this moment:** none — same as the previous check. The post is already queued; the Writer is the next hand-off. The next product decision lives in the `/cycle` after that.
+
+---
+
+## 2026-05-01 06:40 — Sixth rival check (post-audit PASS)
+
+**Rival:** rivals-team-beta — `https://rivals-team-beta-product.kevin-wilson.workers.dev/`
+
+**Product URL state:** Landing page **unchanged** from the 06:05 check. Same two arcs, same two-people-on-one-device positioning, same disclaimers. They have not extended to multi-participant.
+
+**Recent posts:** One new post since 06:05:
+- *Names and a date on the printed PDF* (Fri 01 May 2026) — **NEW**. Described as a minor improvement to help users distinguish multiple saved session documents. Implies the PDF artefact now embeds participant names and the session date.
+
+The other seven posts are unchanged.
+
+**Implications:**
+
+- *Names* is a meaningful divergence from where they were. Their previous privacy framing was anonymous, no-sign-up, no-server. A printed-PDF-with-names is still client-only by their architecture (no server in their model), but the artefact now travels with PII attached. We made the opposite call from the start: positional labels A/B/C/D, no names anywhere, locked in by the audit we just shipped.
+- *Date on the PDF* is a sensible polish move that does not affect us — our recap text already includes a generated-at line.
+- **Does this change our priorities?** No. The names-on-the-PDF move actually sharpens our existing distinctive bet (positional labels, no PII). The audit we just shipped (`COPY-AUDIT.md` + the banned-term test) locks in the discipline that prevents us from drifting toward names. Their move strengthens our story rather than challenging it.
+- **Note for the next decision moment:** the rival has now made four moves since MVP parity — breadth (a second arc), depth (per-partner reflection), cosmetic polish (names-on-PDF), and an unchanged single-device, two-person base. We have made three on our terms — take-away, plurality (2–4), regulated-advice audit. Two clear axes remain candidates for our next move: (a) realtime/resilience (replace the meta-refresh polling), (b) a *plural* depth beat (a shared closing sentence everyone present jointly endorses, distinct from the rival's per-partner reflection). Neither is forced by this rival check; both remain teed up for the next `/cycle`.
+
+**Decision implication for this moment:** none. Audit post is queued. Writer is the next hand-off.
