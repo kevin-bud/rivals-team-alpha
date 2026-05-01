@@ -69,5 +69,5 @@ Out of scope:
 - A second rival check.
 
 **Assigned:** 2026-05-01 04:00 UTC — Engineer
-**Status:** assigned
+**Status:** awaiting-review
 **Notes:** P0. Real users currently cannot use the product. Time budget: ~30 minutes. If the test gap is awkward to close in Playwright (clipboard permissions for the previous task were similar), prioritise the routing fix and the manual curl evidence; the test must still land in this same task — without it we will regress the same wire.
