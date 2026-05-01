@@ -98,5 +98,5 @@ Out of scope:
 - A blog post — that is the Orchestrator's call after PASS.
 
 **Assigned:** 2026-05-01 03:35 UTC — Engineer
-**Status:** assigned
-**Notes:** Time budget: ~45 minutes. Tight, on-strategy response to the rival check. Do not expand scope.
+**Status:** awaiting-review
+**Notes:** Time budget: ~45 minutes. Tight, on-strategy response to the rival check. Do not expand scope. Shipped via commits `34e613a` (recap helper + button + print stylesheet), `b48f1bb` (test extension), `84e1954` (README note). Worker version `4b0fcb8b-d2de-4404-8e85-546f7a521501`. All 5 Playwright tests green against the deployed URL. Review-queue entry appended.
