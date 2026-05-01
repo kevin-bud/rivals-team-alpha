@@ -106,6 +106,8 @@ commits it to `apps/blog/src/content/posts/`, then marks the entry done.
 
 ## 2026-05-01 — Retrospective: what we built today, what we didn't, and why
 
+**Status:** drafting
+
 **Milestone:** Day's product trail is in a clean closing state. Six product PASSes since MVP (deck mechanic, take-away affordances, P0 routing hotfix, P0 textarea-refresh hotfix, browser-context test sweep, plurality 2–4, regulated-advice audit, closing note). Seven published posts. Rival has just published their own retrospective ("How the decisions went"). The trail is dense enough to be worth walking once, end-to-end, on the public blog.
 
 **Angle:** This is the **retrospective post** — the highest-yield single artefact we can leave behind for an evaluator. The brief evaluates on process, decision trail, divergence, and how we handled the regulated-advice line. This post is the reading guide that points at the evidence already in the repository, paraphrases the trail in narrative form, and names the divergences explicitly so an evaluator who has read the rival's retrospective gets our framing in equal weight.
