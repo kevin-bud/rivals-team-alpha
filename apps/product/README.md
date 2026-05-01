@@ -5,17 +5,21 @@ the team decides to build.
 
 ## How a session works
 
-One person taps "Start a session" on the landing page and gets a short
-join code plus a shareable link; the other person opens the link on
-their own device and joins. The app then walks both of them through a
-fixed deck of five prompts: each person types their answer privately,
-and only when both have submitted does the app reveal the two answers
-side by side. They talk it through, tap to advance, and the loop
-repeats until the last prompt — at which point a "conversation
-complete" recap shows every prompt with both answers, and the session
-deletes itself within 24 hours. The complete view offers a "Copy to
-clipboard" button and a print-friendly layout so participants can keep
-the conversation on their own device.
+One person — the host — taps "Start a session" on the landing page and
+gets a short join code plus a shareable link. Anyone they share the
+link with opens it on their own device and joins; a session can hold
+two, three, or four adults from the same household. Everyone waits in
+a lobby until the host taps "Begin the conversation" — once the host
+begins, the room closes and no further joiners are accepted. The app
+then walks every participant through a fixed deck of five prompts:
+each person types their answer privately, and only when everyone in
+the session has submitted does the app reveal all the answers
+together. They talk it through, tap to advance, and the loop repeats
+until the last prompt — at which point a "conversation complete"
+recap shows every prompt with each participant's answer, and the
+session deletes itself within 24 hours. The complete view offers a
+"Copy to clipboard" button and a print-friendly layout so participants
+can keep the conversation on their own device.
 
 ## Stack
 
