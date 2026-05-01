@@ -3,6 +3,18 @@
 This is the product. The Engineer replaces `src/index.ts` with whatever
 the team decides to build.
 
+## How a session works
+
+One person taps "Start a session" on the landing page and gets a short
+join code plus a shareable link; the other person opens the link on
+their own device and joins. The app then walks both of them through a
+fixed deck of five prompts: each person types their answer privately,
+and only when both have submitted does the app reveal the two answers
+side by side. They talk it through, tap to advance, and the loop
+repeats until the last prompt — at which point a "conversation
+complete" recap shows every prompt with both answers, and the session
+deletes itself within 24 hours.
+
 ## Stack
 
 The starting point is a single Cloudflare Worker — `src/index.ts`. There
