@@ -366,6 +366,113 @@ test("two participants walk the full five-prompt deck end-to-end", async ({
     expect(partnerComplete).toContain(`Partner answer for ${fixture.id}`);
   }
 
+  // ---------------------------------------------------------------
+  // Closing note (decision-log 2026-05-01 06:50 — "Plural depth: a
+  // shared closing sentence on the complete view"). Host saves a
+  // recognisable note, asserts it lands in the recap-closing block
+  // and in the inline-script recap payload, then clears it and
+  // asserts the empty-as-delete semantic took effect.
+  // ---------------------------------------------------------------
+  expect(hostComplete).toContain("One last thing — together.");
+  expect(hostComplete).toContain("Save this sentence");
+  expect(hostComplete).toContain("Nothing saved yet.");
+  // The complete view must NOT auto-refresh — the textarea would be
+  // cleared exactly like the answer-view P0 we already fixed.
+  expect(hostComplete).not.toContain('http-equiv="refresh"');
+
+  const closingText =
+    "What a great conversation we had today, hosted via the closing note test.";
+  const setNote = await host.post(`/s/${code}/closing-note`, {
+    form: { text: closingText },
+    maxRedirects: 5,
+  });
+  expect(setNote.status()).toBe(200);
+  const completeWithNote = await fetchInside(host, code);
+  expect(completeWithNote).toContain(closingText);
+  // Recap-closing block heading + last-saved label.
+  expect(completeWithNote).toContain('class="recap-closing"');
+  expect(completeWithNote).toContain("<h3>Together</h3>");
+  expect(completeWithNote).toMatch(
+    /Last saved by Participant A at \d{2}:\d{2}/,
+  );
+  // The clipboard payload must reflect the closing note too.
+  const recapMatchWithNote = completeWithNote.match(
+    /var recapText = (".+?");/s,
+  );
+  expect(recapMatchWithNote).not.toBeNull();
+  if (recapMatchWithNote !== null && typeof recapMatchWithNote[1] === "string") {
+    const recapPayload = JSON.parse(recapMatchWithNote[1]) as string;
+    expect(recapPayload).toContain(closingText);
+    expect(recapPayload).toMatch(
+      /Together — last saved by Participant A at \d{2}:\d{2} \(UTC\):/,
+    );
+  }
+
+  // Now clear the closing note (empty-as-delete) and assert the
+  // closing-note section is back to "Nothing saved yet." and the
+  // recap-closing block + script payload have dropped it.
+  const clearNote = await host.post(`/s/${code}/closing-note`, {
+    form: { text: "" },
+    maxRedirects: 5,
+  });
+  expect(clearNote.status()).toBe(200);
+  const completeAfterClear = await fetchInside(host, code);
+  expect(completeAfterClear).toContain("Nothing saved yet.");
+  expect(completeAfterClear).not.toContain(closingText);
+  expect(completeAfterClear).not.toContain('class="recap-closing"');
+  const recapMatchAfterClear = completeAfterClear.match(
+    /var recapText = (".+?");/s,
+  );
+  expect(recapMatchAfterClear).not.toBeNull();
+  if (
+    recapMatchAfterClear !== null &&
+    typeof recapMatchAfterClear[1] === "string"
+  ) {
+    const recapPayload = JSON.parse(recapMatchAfterClear[1]) as string;
+    expect(recapPayload).not.toContain(closingText);
+    expect(recapPayload).not.toContain("Together — last saved by");
+  }
+
+  await host.dispose();
+  await partner.dispose();
+});
+
+test("closing-note POST is rejected before the deck completes", async ({
+  baseURL,
+}) => {
+  // setClosingNote refuses any save while session.completedAt === null.
+  // We mint a session, partner joins, host begins — but no answers are
+  // submitted — and then try to POST to /s/<code>/closing-note. The
+  // route must surface a non-303 error rather than redirecting back to
+  // the inside view.
+  const host = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+  const partner = await playwrightRequest.newContext({
+    baseURL,
+    ignoreHTTPSErrors: true,
+  });
+
+  const create = await host.post("/sessions", { maxRedirects: 5 });
+  expect(create.status()).toBe(200);
+  const codeMatch = (await create.text()).match(codePattern);
+  expect(codeMatch).not.toBeNull();
+  const code = codeMatch ? codeMatch[0] : "";
+  expect(code).not.toBe("");
+
+  const join = await partner.post(`/s/${code}/join`, { maxRedirects: 5 });
+  expect(join.status()).toBe(200);
+  const begin = await host.post(`/s/${code}/begin`, { maxRedirects: 5 });
+  expect(begin.status()).toBe(200);
+
+  const tooEarly = await host.post(`/s/${code}/closing-note`, {
+    form: { text: "Trying to save before the deck has finished." },
+    maxRedirects: 0,
+  });
+  expect(tooEarly.status()).not.toBe(303);
+  expect([400, 404, 409]).toContain(tooEarly.status());
+
   await host.dispose();
   await partner.dispose();
 });

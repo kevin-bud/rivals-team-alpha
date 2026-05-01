@@ -17,9 +17,11 @@ the session has submitted does the app reveal all the answers
 together. They talk it through, tap to advance, and the loop repeats
 until the last prompt — at which point a "conversation complete"
 recap shows every prompt with each participant's answer, and the
-session deletes itself within 24 hours. The complete view offers a
-"Copy to clipboard" button and a print-friendly layout so participants
-can keep the conversation on their own device.
+session deletes itself within 24 hours. After the deck, anyone present
+can write a single shared sentence to take away — last write wins, and
+it travels with the recap. The complete view offers a "Copy to
+clipboard" button and a print-friendly layout so participants can keep
+the conversation on their own device.
 
 ## Stack
 

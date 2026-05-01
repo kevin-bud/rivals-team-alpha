@@ -111,8 +111,16 @@ expected.
 | `renderCompleteView` (print button) | "Print this page" | British English | compliant |
 | `renderCompleteView` (back link) | "Back to the start" | British English | compliant |
 | `renderCompleteView` (button flash, JS) | "Copied" / "Copy failed" | British English | compliant (lives inside `<script>`, exempt by script-strip) |
+| `renderCompleteView` (closing-note h2) | "One last thing — together." | open, neutral, British English | compliant |
+| `renderCompleteView` (closing-note helper) | "Is there a sentence you'd like to take away from this conversation? Anyone here can write or revise it. Refresh to see updates from the others." | open, neutral, no advice, British English | compliant |
+| `renderCompleteView` (closing-note submit) | "Save this sentence" | open, neutral, British English | compliant |
+| `renderCompleteView` (last-saved, filled) | "Last saved by Participant X at HH:MM" | British English | compliant |
+| `renderCompleteView` (last-saved, empty) | "Nothing saved yet." | British English | compliant |
+| `renderCompleteView` (recap-closing heading) | "Together" | open, neutral, British English | compliant |
+| `renderCompleteView` (closing-note action error) | "We couldn't save that closing note. The conversation may not have finished yet." | open, neutral, British English | compliant |
 | `renderRecapText` (title line) | "Roundtable — conversation recap" | British English | compliant |
 | `renderRecapText` (line label) | "Prompt <n>: <text>" / "Participant <X>: <answer>" / "(no answer)" | British English | compliant |
+| `renderRecapText` (closing-note line) | "Together — last saved by Participant X at HH:MM (UTC):" | open, neutral, British English | compliant |
 | `renderRecapText` (footer disclaimer) | "Generated <iso> from a Roundtable session. Roundtable does not provide financial, tax, legal, or investment advice." | regulated-advice disclaimer | compliant by exception (disclaimer) |
 | `renderJoinView` (title) | "Roundtable — join session <code>" | British English | compliant |
 | `renderJoinView` (h1) | "Join this session" | British English | compliant |
@@ -128,7 +136,7 @@ expected.
 
 ## Summary
 
-- Compliant: 67
+- Compliant: 76
 - Compliant by exception (disclaimer): 3 (the inline landing-page positioning span "It is not a budget tool, not an advisor", the shared `<footer>` disclaimer, and the recap-text footer disclaimer rendered inside the inline `<script>`)
 - Flagged: 0
 
@@ -142,4 +150,7 @@ paraphrased or summarised. The disclaimer block in `sharedFooter`
 carries `data-disclaimer="true"`, and the inline positioning clause in
 the landing lede is wrapped in `<span data-disclaimer="true">…</span>`,
 so the regression test can exempt them by element rather than by
-string-match. Performed 2026-05-01.
+string-match. Performed 2026-05-01; extended on 2026-05-01 to cover
+the closing-note section on the complete view (decision-log entry
+2026-05-01 06:50 — "Plural depth: a shared closing sentence on the
+complete view").
