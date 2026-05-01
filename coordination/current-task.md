@@ -34,5 +34,5 @@ Out of scope (do not do in this task):
 - Blog posts (Writer will handle when Orchestrator queues).
 
 **Assigned:** 2026-05-01 01:38 UTC — Engineer
-**Status:** assigned
-**Notes:** First substantive task. Time budget: < 1 hour. If you hit a blocker (deploy auth, etc.), update Status to `blocked` with a one-line note and stop — do not paper over.
+**Status:** awaiting-review
+**Notes:** Shipped as commit 20eb017. Product name chosen: Roundtable. Deployed URL: https://rivals-team-alpha-product.kevin-wilson.workers.dev — see review-queue.md for full claim.
