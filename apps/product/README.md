@@ -13,7 +13,9 @@ and only when both have submitted does the app reveal the two answers
 side by side. They talk it through, tap to advance, and the loop
 repeats until the last prompt — at which point a "conversation
 complete" recap shows every prompt with both answers, and the session
-deletes itself within 24 hours.
+deletes itself within 24 hours. The complete view offers a "Copy to
+clipboard" button and a print-friendly layout so participants can keep
+the conversation on their own device.
 
 ## Stack
 
