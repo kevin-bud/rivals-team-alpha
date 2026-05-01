@@ -28,7 +28,7 @@ the voice guidance.
 2. Fill in the frontmatter.
 3. Write the body.
 4. Run `pnpm --filter blog build` to confirm the schema validates.
-5. Deploy via `pnpm --filter blog deploy`.
+5. Deploy via `pnpm deploy:blog` (this runs the Astro build first via turbo; `pnpm --filter blog deploy` skips the build and ships stale `dist/`).
 
 The RSS feed at `/rss.xml` is generated automatically — you do not
 need to update it manually.
